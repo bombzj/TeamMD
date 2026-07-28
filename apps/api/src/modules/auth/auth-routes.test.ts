@@ -18,6 +18,8 @@ const config: ServerConfig = {
   port: 3000,
   webOrigin: 'http://localhost:5173',
   databaseUrl: 'mysql://unused',
+  collaborationPort: 3001,
+  collaborationUrl: 'ws://localhost:3001/',
   sessionTtlDays: 30,
   secureCookies: false,
 };

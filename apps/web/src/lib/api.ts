@@ -1,5 +1,7 @@
 import {
   authResponseSchema,
+  collaborationCheckpointResponseSchema,
+  collaborationTicketResponseSchema,
   documentContentResponseSchema,
   documentSummarySchema,
   errorResponseSchema,
@@ -8,6 +10,8 @@ import {
   trashResponseSchema,
   workspaceTreeResponseSchema,
   type AuthResponse,
+  type CollaborationCheckpointResponse,
+  type CollaborationTicketResponse,
   type CreateDocumentRequest,
   type CreateFolderRequest,
   type DocumentSummaryDto,
@@ -142,6 +146,26 @@ export async function loadDocument(
 ): Promise<DocumentContentResponse> {
   return requestJson(`/api/v1/documents/${documentId}`, undefined, (value) =>
     documentContentResponseSchema.parse(value),
+  );
+}
+
+export async function createCollaborationTicket(
+  documentId: string,
+): Promise<CollaborationTicketResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/collaboration-ticket`,
+    mutation('POST'),
+    (value) => collaborationTicketResponseSchema.parse(value),
+  );
+}
+
+export async function checkpointCollaboration(
+  documentId: string,
+): Promise<CollaborationCheckpointResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/collaboration-checkpoint`,
+    mutation('POST', {}),
+    (value) => collaborationCheckpointResponseSchema.parse(value),
   );
 }
 

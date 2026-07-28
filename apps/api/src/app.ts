@@ -8,6 +8,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 
 import { ApiError, sendApiError } from './lib/api-error.js';
+import type { CollaborationCheckpointService } from './modules/collaboration/collaboration-checkpoint-service.js';
+import { CollaborationService } from './modules/collaboration/collaboration-service.js';
 import { AuthService } from './modules/auth/auth-service.js';
 import { registerAuthRoutes } from './modules/auth/auth-routes.js';
 import './modules/auth/auth-types.js';
@@ -18,6 +20,8 @@ type BuildAppOptions = {
   config: ServerConfig;
   prisma: PrismaClient;
   authService?: AuthService;
+  collaborationCheckpointService?: CollaborationCheckpointService;
+  collaborationService?: CollaborationService;
   workspaceService?: WorkspaceService;
 };
 
@@ -91,6 +95,16 @@ export async function buildApp(
       });
       registerWorkspaceRoutes(api, {
         authService,
+        ...(options.collaborationCheckpointService === undefined
+          ? {}
+          : {
+              collaborationCheckpointService:
+                options.collaborationCheckpointService,
+            }),
+        collaborationService:
+          options.collaborationService ??
+          new CollaborationService(options.prisma),
+        collaborationWebsocketUrl: options.config.collaborationUrl,
         webOrigin: options.config.webOrigin,
         workspaceService:
           options.workspaceService ?? new WorkspaceService(options.prisma),

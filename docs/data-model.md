@@ -18,6 +18,8 @@ erDiagram
   Document ||--o{ Invitation : invites
   User ||--o{ Invitation : sends
   Document ||--o{ AuditEvent : records
+  Document ||--o| CollaborationState : synchronizes
+  Document ||--o{ CollaborationTicket : authorizes
 ```
 
 ## Entities
@@ -96,6 +98,20 @@ No update or delete operation is exposed for a revision. Creation and document-h
 
 Constraints prohibit access rows for the owner. Deleting or trashing a document suspends access through query policy; permanent deletion cascades access rows only after retention policy permits.
 
+### `CollaborationState`
+
+| Field                  | Notes                                                        |
+| ---------------------- | ------------------------------------------------------------ |
+| `documentId`           | One operational state per document                           |
+| `generation`           | Reserved for future compaction or format migration           |
+| `yjsState`             | Compacted Yjs update; durable operational state, not history |
+| `checkpointRevisionId` | Immutable revision represented by the latest explicit Save   |
+| `updatedAt`            | Last operational-state persistence time                      |
+
+### `CollaborationTicket`
+
+One-time, document-scoped WebSocket credentials store only a token hash and bind the document, user, and authenticated session. Tickets expire after one minute and become invalid after first consumption. Session and document access are revalidated during consumption.
+
 ### `Invitation`
 
 | Field                                                             | Notes                                            |
@@ -125,6 +141,17 @@ Fields include opaque `id`, `actorId`, `documentId`, stable `action`, bounded va
 6. Commit and return the new head.
 
 A unique `(documentId, ordinal)` constraint is the final guard against duplicate ordinals. Retry only known transient transaction errors; never retry a semantic revision conflict automatically.
+
+## Collaborative Checkpoint
+
+1. Authenticate and CSRF-check the HTTP checkpoint request.
+2. Open the active Hocuspocus room and serialize against room persistence.
+3. Read the exact authoritative `Y.Text('content')` snapshot and compacted Yjs state.
+4. Revalidate owner/editor access inside the row-locked revision transaction.
+5. Insert the immutable revision, advance `Document.currentRevisionId`, and advance `CollaborationState.checkpointRevisionId` atomically.
+6. Broadcast validated revision metadata and the saved content hash to room clients.
+
+WebSocket synchronization and operational-state persistence do not mean Saved. Only this explicit checkpoint advances immutable history.
 
 ## Deletion And Retention
 

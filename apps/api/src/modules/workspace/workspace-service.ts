@@ -21,6 +21,7 @@ import {
 import { createHash } from 'node:crypto';
 
 import { ApiError } from '../../lib/api-error.js';
+import { requireDocumentAccess } from './document-access-policy.js';
 
 const rootParentKey = '__root__';
 const maximumFolderDepth = 20;
@@ -367,29 +368,25 @@ export class WorkspaceService {
     userId: string,
     documentId: string,
   ): Promise<DocumentContentResponse> {
-    const document = await this.prisma.document.findFirst({
-      where: { id: documentId, ownerId: userId, trashedAt: null },
-    });
-    if (document === null) throw notFound('Document');
-    const folders = await this.prisma.folder.findMany({
-      where: { ownerId: userId },
-      select: { id: true, parentId: true, trashedAt: true },
-    });
-    const folderById = new Map(folders.map((folder) => [folder.id, folder]));
-    if (
-      document.folderId !== null &&
-      !isFolderVisible(document.folderId, folderById)
-    ) {
-      throw notFound('Document');
-    }
+    const access = await requireDocumentAccess(
+      this.prisma,
+      userId,
+      documentId,
+      'read',
+    );
     const revision = await requireCurrentRevision(
       this.prisma,
-      document.currentRevisionId,
+      access.document.currentRevisionId,
     );
 
     return {
-      ...toDocumentDto({ ...document, currentRevision: revision }),
-      permission: 'owner',
+      ...toDocumentDto({
+        ...access.document,
+        folderId:
+          access.permission === 'owner' ? access.document.folderId : null,
+        currentRevision: revision,
+      }),
+      permission: access.permission,
       content: revision.content,
     };
   }
@@ -399,6 +396,7 @@ export class WorkspaceService {
     documentId: string,
     input: SaveDocumentRequest,
     requestId: string,
+    advanceCollaborationCheckpoint = false,
   ): Promise<SaveDocumentResponse> {
     const byteSize = Buffer.byteLength(input.content, 'utf8');
     if (byteSize > maximumMarkdownBytes) {
@@ -416,26 +414,35 @@ export class WorkspaceService {
       const locked = await transaction.$queryRaw<Array<{ id: string }>>`
         SELECT id
         FROM Document
-        WHERE id = ${documentId} AND ownerId = ${userId}
+        WHERE id = ${documentId}
         FOR UPDATE
       `;
       if (locked.length === 0) throw notFound('Document');
 
-      const document = await transaction.document.findFirst({
-        where: { id: documentId, ownerId: userId, trashedAt: null },
-      });
-      if (document === null) throw notFound('Document');
-      const folders = await loadFolderStates(transaction, userId);
-      if (
-        document.folderId !== null &&
-        !isFolderVisible(document.folderId, folders)
-      ) {
-        throw notFound('Document');
-      }
+      const access = await requireDocumentAccess(
+        transaction,
+        userId,
+        documentId,
+        'write',
+      );
       const currentRevision = await requireCurrentRevision(
         transaction,
-        document.currentRevisionId,
+        access.document.currentRevisionId,
       );
+      if (!advanceCollaborationCheckpoint) {
+        const collaborationState =
+          await transaction.collaborationState.findUnique({
+            where: { documentId },
+            select: { documentId: true },
+          });
+        if (collaborationState !== null) {
+          throw new ApiError(
+            409,
+            'REVISION_CONFLICT',
+            'This document must be saved from its collaboration room.',
+          );
+        }
+      }
       if (currentRevision.id !== input.baseRevisionId) {
         throw revisionConflict(input.baseRevisionId, currentRevision);
       }
@@ -457,6 +464,18 @@ export class WorkspaceService {
         where: { id: documentId },
         data: { currentRevisionId: revision.id },
       });
+      if (advanceCollaborationCheckpoint) {
+        const checkpoint = await transaction.collaborationState.updateMany({
+          where: {
+            documentId,
+            checkpointRevisionId: currentRevision.id,
+          },
+          data: { checkpointRevisionId: revision.id },
+        });
+        if (checkpoint.count !== 1) {
+          throw revisionConflict(input.baseRevisionId, currentRevision);
+        }
+      }
       await createAuditEvent(transaction, userId, 'DOCUMENT_SAVE', requestId, {
         documentId,
         revisionId: revision.id,
@@ -565,7 +584,7 @@ export class WorkspaceService {
 }
 
 async function loadFolderStates(
-  transaction: Prisma.TransactionClient,
+  transaction: Pick<Prisma.TransactionClient, 'folder'>,
   userId: string,
 ): Promise<Map<string, FolderState>> {
   const folders = await transaction.folder.findMany({

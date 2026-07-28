@@ -55,12 +55,14 @@ Each phase ends with usable behavior, focused automated tests, updated documenta
 
 **Exit:** launch checklist, threat model, recovery objectives, and operational ownership are approved.
 
-## Later: Real-Time Collaboration
+## Phase 6: Real-Time Collaboration
 
-- Validate user demand and define offline/conflict semantics first.
+- Record the validated requirement and define online/offline/checkpoint semantics.
+- Complete document access roles and invitation workflows using one HTTP/WebSocket authorization policy.
 - Introduce Yjs documents and WebSocket collaboration as a separate service boundary or API module.
 - Authenticate socket upgrades and authorize each room server-side.
 - Persist CRDT updates and periodically materialize immutable Markdown checkpoints compatible with revision history.
+- Bind collaborative source editing through CodeMirror 6 and render sanitized preview through Vditor.
 - Add awareness/presence as ephemeral data; never persist cursor positions as document history.
 
 Real-time work must not weaken explicit snapshots, auditability, revocation, or Markdown export.

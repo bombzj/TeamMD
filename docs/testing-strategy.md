@@ -2,7 +2,7 @@
 
 ## Goals
 
-Tests protect the highest-risk properties: no unauthorized data access, no silent overwrite, immutable recoverable history, safe invitation use, and stable editor behavior. Test fidelity matters more than raw count.
+Tests protect the highest-risk properties: no unauthorized data access, convergent collaboration, no silent data loss, immutable recoverable checkpoints, safe invitation use, and stable editor behavior. Test fidelity matters more than raw count.
 
 ## Layers
 
@@ -27,6 +27,7 @@ Use Fastify injection with the real application composition and a disposable rea
 - invitation expiry, email match, single use, duplicate/revoked invitations, and role changes;
 - folder cycles, active-name uniqueness under MySQL null/collation behavior, subtree trash/restore, and limits;
 - response schema validation and secret/content log redaction.
+- one-time collaboration ticket expiry/reuse, viewer read-only enforcement, two-provider convergence, checkpoint exactness, and restart recovery.
 
 Do not substitute SQLite for MySQL transaction, collation, unique-index, or locking tests.
 
@@ -34,10 +35,10 @@ Do not substitute SQLite for MySQL transaction, collation, unique-index, or lock
 
 Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not React internals. Cover:
 
-- Vditor initializes once per mount, switches documents safely, and destroys listeners/instances;
-- dirty state, `Ctrl+S`/`Cmd+S`, saving, success, failure, and disabled/read-only controls;
-- background queries do not replace unsaved text;
-- conflict dialog preserves local text and offers reload/copy/compare paths;
+- the CodeMirror/Yjs adapter initializes once, obtains fresh reconnect tickets, and destroys provider/listeners/instances;
+- Vditor receives only sanitized preview input and is never a second writable surface;
+- shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
+- background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;
 - navigation and tab-close warnings when dirty;
 - permission-based presentation while assuming the API remains authoritative;
 - keyboard tree navigation, focus restoration, labels, dialog traps, and announcements.
@@ -49,7 +50,7 @@ Use Playwright against built web/API applications and isolated MySQL data. Criti
 1. Register, create folders/document, edit, save, reload, and observe content.
 2. Save multiple revisions, inspect history, restore one, and verify a new head.
 3. Owner invites editor; editor accepts and saves; owner sees attribution.
-4. Two browser contexts edit one base; first save succeeds and second gets conflict without text loss.
+4. Two browser contexts edit concurrently, converge, and observe the same explicit checkpoint without text loss.
 5. Owner revokes editor; editor's already-open page can no longer save or refetch content.
 6. Viewer can read but cannot mutate through UI or direct request.
 7. Trash and restore a folder subtree; permanently delete with confirmation.
@@ -67,15 +68,16 @@ Run Chromium on every pull request and add Firefox/WebKit in scheduled or releas
 - Backup restore drill and point-in-time recovery validation
 - Load tests for tree reads, document fetches, saves, and history pagination
 
-## Focused Concurrency Test
+## Focused Collaboration Test
 
-Create a document at revision 1. Start two independent API requests with the same `baseRevisionId` and different content. Synchronize them close enough to overlap. Assert:
+Create a document at revision 1 and connect two independent Yjs providers. Apply concurrent edits and assert:
 
-- one response is `200`, one is `409 REVISION_CONFLICT`;
-- the document head points to the successful revision;
-- only one new ordinal exists;
-- the losing content is not persisted as head or silently substituted;
-- all committed revisions remain immutable.
+- both clients converge to byte-identical Markdown;
+- viewer-originated updates do not mutate the room;
+- explicit Save checkpoints the authoritative room snapshot exactly once;
+- all clients receive the same new revision metadata;
+- operational state reloads after a collaboration-server restart;
+- edits after the captured checkpoint remain visibly unsaved.
 
 Repeat enough times in MySQL CI to expose race behavior, but keep one deterministic service-level locking test for fast feedback.
 

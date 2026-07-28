@@ -61,13 +61,15 @@ Permanent folder and document deletion requires the JSON body `{ "confirmation":
 | `POST`   | `/documents`                                           | Create document with initial empty revision   |
 | `GET`    | `/documents/:documentId`                               | Get metadata, permission, and current content |
 | `PATCH`  | `/documents/:documentId`                               | Owner renames or moves document               |
-| `PUT`    | `/documents/:documentId/content`                       | Owner/editor saves a new immutable revision   |
+| `PUT`    | `/documents/:documentId/content`                       | Legacy non-collaborative immutable save       |
 | `DELETE` | `/documents/:documentId`                               | Owner moves document to trash                 |
 | `POST`   | `/documents/:documentId/restore`                       | Owner restores document                       |
 | `DELETE` | `/documents/:documentId/permanent`                     | Owner permanently deletes after confirmation  |
 | `GET`    | `/documents/:documentId/revisions`                     | List authorized revision metadata             |
 | `GET`    | `/documents/:documentId/revisions/:revisionId`         | Get authorized historical content             |
 | `POST`   | `/documents/:documentId/revisions/:revisionId/restore` | Create new head from historical content       |
+| `POST`   | `/documents/:documentId/collaboration-ticket`          | Issue a one-time room ticket                  |
+| `POST`   | `/documents/:documentId/collaboration-checkpoint`      | Save the authoritative room as a new revision |
 
 Save request:
 
@@ -103,6 +105,8 @@ Successful save returns `200` with document ID and new revision metadata. A stal
 The conflict response omits content to keep response size and accidental exposure bounded. The authorized client may fetch the current document and present reload, copy-local-content, and compare workflows. A force-save flag is not provided in MVP.
 
 Restore requires the caller's current `baseRevisionId` as well as the historical path revision, preventing a restore from racing with a newer save.
+
+Collaboration ticket creation requires the authenticated session, CSRF token, and allowed origin. The response contains a random one-time token, WebSocket URL, document ID, current permission, and expiry. Tickets expire after one minute, are bound to one document and session, and are consumed atomically during WebSocket authentication. The raw ticket is never stored or logged.
 
 ## Sharing And Invitations
 

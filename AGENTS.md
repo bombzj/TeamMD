@@ -4,7 +4,7 @@ This file is the authoritative engineering guide for humans and coding agents wo
 
 ## Mission
 
-Build a secure, reliable online Markdown workspace using Vditor. The first release supports explicit saves, immutable revision history, file sharing, and conflict detection. It does not provide live character-by-character collaboration.
+Build a secure, reliable online Markdown workspace with live Yjs collaboration, explicit immutable checkpoints, file sharing, and recoverable revision history. CodeMirror is the writable collaborative surface; Vditor renders sanitized preview.
 
 ## Read Before Changing Code
 
@@ -47,7 +47,7 @@ Dependency direction is one way:
 7. Document roles are `owner`, `editor`, and `viewer`. Exactly one owner exists in MVP. Ownership transfer is out of scope.
 8. Invitations are document-scoped, expire, are single-use, and may target a registered account or a normalized pending email address.
 9. Database changes use reviewed Prisma migrations. Never use schema push in shared environments.
-10. Real-time collaboration must be introduced behind a separate protocol and persistence design; do not retrofit it into MVP save endpoints.
+10. Yjs operational state uses the authenticated collaboration protocol and separate persistence. Collaborative Save reads the authoritative room and creates an immutable revision; clients never submit whole-document content for a collaborative checkpoint.
 
 ## Engineering Workflow
 
@@ -74,7 +74,7 @@ Prefer explicit domain services over business logic in route handlers or React c
 - API services: authorization matrix, stale-save conflict, transaction behavior, and data isolation tests.
 - API routes: authentication, validation, status codes, and error envelope tests using Fastify injection.
 - Web: editor lifecycle, dirty state, conflict handling, navigation guards, and permission presentation tests.
-- End to end: register, create, edit, save, invite, accept, collaborate through explicit saves, inspect history, restore, revoke.
+- End to end: register, create, edit concurrently, checkpoint, invite, accept, inspect history, restore, revoke.
 
 Never weaken or delete a failing test merely to make CI pass. Record unrelated failures in the handoff.
 

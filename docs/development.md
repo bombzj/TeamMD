@@ -36,7 +36,7 @@ pnpm --filter @mymd/api prisma:migrate
 pnpm dev
 ```
 
-Local endpoints are web `http://localhost:5173` and API `http://localhost:3000`.
+Local endpoints are web `http://localhost:5173`, API `http://localhost:3000`, and collaboration WebSocket `ws://localhost:3001`.
 
 ## Commands
 
@@ -68,8 +68,9 @@ The local runtime account is intentionally unable to create Prisma shadow databa
 - Keep route handlers thin: parse contract, call one use case, serialize contract.
 - Keep authorization and transaction logic in API domain services.
 - Pass explicit dependencies such as clock, token generator, hasher, email sender, and repositories to services where useful for deterministic tests.
-- Keep Vditor behind a React adapter that owns initialization, value transfer, resize, mode configuration, and teardown.
-- Use TanStack Query for server state. Keep unsaved editor content local and never overwrite dirty local state from a background refetch.
+- Keep CodeMirror, Yjs, and Hocuspocus behind a React adapter that owns connection, awareness, binding, reconnect tickets, and teardown.
+- Use Vditor only for sanitized static preview. It must not be writable alongside CodeMirror.
+- Use TanStack Query for HTTP server state. Yjs owns the shared draft; never replace it from a background refetch.
 - Use stable error codes and exhaustive client handling for save conflicts and authentication expiry.
 - Validate environment once at startup and fail with names of invalid variables, never their secret values.
 

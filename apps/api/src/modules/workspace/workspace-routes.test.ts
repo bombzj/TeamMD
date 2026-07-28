@@ -1,4 +1,5 @@
 import {
+  collaborationTicketResponseSchema,
   documentContentResponseSchema,
   documentSummarySchema,
   errorResponseSchema,
@@ -16,6 +17,8 @@ import { buildApp } from '../../app.js';
 import { hashToken } from '../../lib/tokens.js';
 import type { AuthService } from '../auth/auth-service.js';
 import type { AuthenticatedSession } from '../auth/auth-types.js';
+import type { CollaborationCheckpointService } from '../collaboration/collaboration-checkpoint-service.js';
+import type { CollaborationService } from '../collaboration/collaboration-service.js';
 import type { WorkspaceService } from './workspace-service.js';
 
 const config: ServerConfig = {
@@ -24,6 +27,8 @@ const config: ServerConfig = {
   port: 3000,
   webOrigin: 'http://localhost:5173',
   databaseUrl: 'mysql://unused',
+  collaborationPort: 3001,
+  collaborationUrl: 'ws://localhost:3001/',
   sessionTtlDays: 30,
   secureCookies: false,
 };
@@ -104,6 +109,24 @@ class FakeWorkspaceService {
   public trashDocument = vi.fn().mockResolvedValue(undefined);
   public restoreDocument = vi.fn().mockResolvedValue(document);
   public permanentlyDeleteDocument = vi.fn().mockResolvedValue(undefined);
+}
+
+class FakeCollaborationService {
+  public createTicket = vi.fn().mockResolvedValue({
+    ticket: 'a'.repeat(43),
+    documentId: document.id,
+    permission: 'owner',
+    websocketUrl: config.collaborationUrl,
+    expiresAt: '2026-07-27T12:01:00.000Z',
+  });
+}
+
+class FakeCollaborationCheckpointService {
+  public checkpoint = vi.fn().mockResolvedValue({
+    ...saveResponse,
+    contentHash:
+      '5a20c83155116d212e04cd1301b39da22c04944de6c80fb6f17c1db0a9b037fc',
+  });
 }
 
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
@@ -277,9 +300,63 @@ describe('workspace routes', () => {
     );
     expect(service.saveDocument).not.toHaveBeenCalled();
   });
+
+  it('issues a scoped collaboration ticket with mutation authentication', async () => {
+    const collaborationService = new FakeCollaborationService();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      collaborationService,
+    );
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/collaboration-ticket`,
+      headers: authHeaders(),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(collaborationTicketResponseSchema.parse(response.json())).toEqual(
+      await collaborationService.createTicket.mock.results[0]?.value,
+    );
+    expect(collaborationService.createTicket).toHaveBeenCalledWith(
+      userId,
+      'cm1234567890sessionidxyz',
+      document.id,
+      config.collaborationUrl,
+    );
+  });
+
+  it('checkpoints the authoritative collaboration room without client content', async () => {
+    const checkpointService = new FakeCollaborationCheckpointService();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      new FakeCollaborationService(),
+      checkpointService,
+    );
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/collaboration-checkpoint`,
+      headers: authHeaders(),
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(
+      await checkpointService.checkpoint.mock.results[0]?.value,
+    );
+    expect(checkpointService.checkpoint).toHaveBeenCalledWith(
+      userId,
+      document.id,
+      {},
+      expect.any(String),
+    );
+  });
 });
 
-async function createTestApp(service = new FakeWorkspaceService()) {
+async function createTestApp(
+  service = new FakeWorkspaceService(),
+  collaborationService = new FakeCollaborationService(),
+  collaborationCheckpointService = new FakeCollaborationCheckpointService(),
+) {
   const prisma = {
     $queryRaw: vi.fn().mockResolvedValue([{ result: 1 }]),
   } as unknown as PrismaClient;
@@ -287,6 +364,10 @@ async function createTestApp(service = new FakeWorkspaceService()) {
     config,
     prisma,
     authService: new FakeAuthService() as unknown as AuthService,
+    collaborationCheckpointService:
+      collaborationCheckpointService as unknown as CollaborationCheckpointService,
+    collaborationService:
+      collaborationService as unknown as CollaborationService,
     workspaceService: service as unknown as WorkspaceService,
   });
   apps.push(app);

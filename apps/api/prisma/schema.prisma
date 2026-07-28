@@ -22,6 +22,9 @@ model User {
   folders           Folder[]
   documents         Document[]
   documentRevisions DocumentRevision[]
+  documentAccesses  DocumentAccess[]   @relation("AccessRecipient")
+  accessGrants      DocumentAccess[]   @relation("AccessGrantor")
+  collaborationTickets CollaborationTicket[]
 
   @@index([disabledAt])
 }
@@ -39,6 +42,7 @@ model Session {
   ipPrefixHash     String?   @db.Char(64)
   createdAt        DateTime  @default(now()) @db.DateTime(3)
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collaborationTickets CollaborationTicket[]
 
   @@index([userId, revokedAt, expiresAt])
 }
@@ -92,10 +96,34 @@ model Document {
   owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   folder            Folder?            @relation(fields: [folderId], references: [id], onDelete: Restrict)
   revisions         DocumentRevision[]
+  accesses          DocumentAccess[]
+  collaborationState CollaborationState?
+  collaborationTickets CollaborationTicket[]
 
   @@unique([ownerId, parentKey, activeNameKey])
   @@index([ownerId, folderId, trashedAt])
   @@index([currentRevisionId])
+}
+
+enum DocumentAccessRole {
+  EDITOR
+  VIEWER
+}
+
+model DocumentAccess {
+  documentId String             @db.VarChar(30)
+  userId      String             @db.VarChar(30)
+  role        DocumentAccessRole
+  grantedById String             @db.VarChar(30)
+  createdAt   DateTime           @default(now()) @db.DateTime(3)
+  updatedAt   DateTime           @updatedAt @db.DateTime(3)
+  document    Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User               @relation("AccessRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy   User               @relation("AccessGrantor", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@id([documentId, userId])
+  @@index([userId, role, updatedAt])
+  @@index([grantedById])
 }
 
 model DocumentRevision {
@@ -117,4 +145,32 @@ model DocumentRevision {
   @@unique([documentId, ordinal])
   @@index([authorId, createdAt])
   @@index([restoredFromRevisionId])
+}
+
+model CollaborationTicket {
+  id         String    @id @default(cuid()) @db.VarChar(30)
+  tokenHash  String    @unique @db.Char(64)
+  documentId String    @db.VarChar(30)
+  sessionId  String    @db.VarChar(30)
+  userId     String    @db.VarChar(30)
+  expiresAt  DateTime  @db.DateTime(3)
+  consumedAt DateTime? @db.DateTime(3)
+  createdAt  DateTime  @default(now()) @db.DateTime(3)
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, expiresAt])
+  @@index([sessionId, consumedAt])
+}
+
+model CollaborationState {
+  documentId          String   @id @db.VarChar(30)
+  generation          Int      @default(1)
+  yjsState             Bytes    @db.LongBlob
+  checkpointRevisionId String   @db.VarChar(30)
+  updatedAt            DateTime @updatedAt @db.DateTime(3)
+  document             Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
 }

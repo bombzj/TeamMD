@@ -1,4 +1,7 @@
 import {
+  collaborationCheckpointResponseSchema,
+  collaborativeCheckpointRequestSchema,
+  collaborationTicketResponseSchema,
   createDocumentRequestSchema,
   createFolderRequestSchema,
   documentContentResponseSchema,
@@ -14,12 +17,18 @@ import {
 } from '@mymd/contracts';
 import type { FastifyInstance } from 'fastify';
 
+import { ApiError } from '../../lib/api-error.js';
 import { requireMutationAuth, requireSession } from '../auth/auth-guards.js';
 import type { AuthService } from '../auth/auth-service.js';
+import type { CollaborationCheckpointService } from '../collaboration/collaboration-checkpoint-service.js';
+import type { CollaborationService } from '../collaboration/collaboration-service.js';
 import type { WorkspaceService } from './workspace-service.js';
 
 type WorkspaceRouteOptions = {
   authService: AuthService;
+  collaborationCheckpointService?: CollaborationCheckpointService;
+  collaborationService: CollaborationService;
+  collaborationWebsocketUrl: string;
   webOrigin: string;
   workspaceService: WorkspaceService;
 };
@@ -124,6 +133,48 @@ export function registerWorkspaceRoutes(
     );
     return reply.status(201).send(documentSummarySchema.parse(result));
   });
+
+  app.post<{ Params: { documentId: string } }>(
+    '/documents/:documentId/collaboration-ticket',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      const result = await options.collaborationService.createTicket(
+        session.user.id,
+        session.id,
+        request.params.documentId,
+        options.collaborationWebsocketUrl,
+      );
+      return reply
+        .header('Cache-Control', 'no-store')
+        .send(collaborationTicketResponseSchema.parse(result));
+    },
+  );
+
+  app.post<{ Params: { documentId: string } }>(
+    '/documents/:documentId/collaboration-checkpoint',
+    saveRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      if (options.collaborationCheckpointService === undefined) {
+        throw new ApiError(
+          503,
+          'INTERNAL_ERROR',
+          'Collaboration is temporarily unavailable.',
+        );
+      }
+      const body = collaborativeCheckpointRequestSchema.parse(
+        request.body ?? {},
+      );
+      const result = await options.collaborationCheckpointService.checkpoint(
+        session.user.id,
+        request.params.documentId,
+        body,
+        request.id,
+      );
+      return reply.send(collaborationCheckpointResponseSchema.parse(result));
+    },
+  );
 
   app.get<{ Params: { documentId: string } }>(
     '/documents/:documentId',

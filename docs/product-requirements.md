@@ -43,6 +43,8 @@ MyMD gives individuals and small teams a dependable place to organize, edit, sha
 - **REQ-EDIT-003:** Each successful save atomically creates one immutable revision and makes it the document head.
 - **REQ-EDIT-004:** A save must identify the revision from which editing began. A stale base receives a conflict response containing safe head metadata, never an automatic overwrite.
 - **REQ-EDIT-005:** Content is bounded by a configurable UTF-8 byte limit. The initial proposal is 2 MiB per revision.
+- **REQ-EDIT-006:** Authorized editors connected to the same collaborative document converge on the same Markdown text without whole-document last-write-wins replacement.
+- **REQ-EDIT-007:** Collaborative operational updates are distinct from immutable revisions. Explicit Save captures a durable server-authoritative checkpoint; presence and cursors are ephemeral.
 
 ### Sharing
 
@@ -77,9 +79,8 @@ MyMD gives individuals and small teams a dependable place to organize, edit, sha
 - Structured logs include request ID, actor ID, action, result, and latency without document content or secrets.
 - Daily encrypted backups with tested point-in-time recovery before production launch.
 
-## Explicit Non-Goals For MVP
+## Explicit Non-Goals For The First Collaborative Release
 
-- Character-level real-time co-editing, live cursors, or presence
 - Offline-first synchronization
 - Comments, suggestions, mentions, and notifications beyond invitation email
 - Public or anonymous links

@@ -11,6 +11,8 @@ const prisma = new PrismaClient({ log: ['error'] });
 const workspaceService = new WorkspaceService(prisma);
 const testEmail = `workspace-test-${crypto.randomUUID()}@example.test`;
 let userId: string;
+let editorId: string;
+let viewerId: string;
 
 beforeAll(async () => {
   await prisma.$connect();
@@ -22,6 +24,22 @@ beforeAll(async () => {
     },
   });
   userId = user.id;
+  const editor = await prisma.user.create({
+    data: {
+      email: `editor-${testEmail}`,
+      normalizedEmail: `editor-${testEmail}`,
+      passwordHash: 'integration-test-only',
+    },
+  });
+  editorId = editor.id;
+  const viewer = await prisma.user.create({
+    data: {
+      email: `viewer-${testEmail}`,
+      normalizedEmail: `viewer-${testEmail}`,
+      passwordHash: 'integration-test-only',
+    },
+  });
+  viewerId = viewer.id;
 });
 
 afterAll(async () => {
@@ -33,7 +51,9 @@ afterAll(async () => {
       });
       if (result.count === 0) break;
     }
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [userId, editorId, viewerId] } },
+    });
   }
   await prisma.$disconnect();
 });
@@ -157,5 +177,66 @@ describe('WorkspaceService with MySQL', () => {
       content: '# Vditor\n\nExplicit saves keep every draft.\n',
       saveMessage: 'Write introduction',
     });
+  });
+
+  it('allows editors to save, viewers to read, and hides owner hierarchy', async () => {
+    const folder = await workspaceService.createFolder(
+      userId,
+      { name: 'Private owner folder', parentId: null },
+      'workspace-access-folder',
+    );
+    const created = await workspaceService.createDocument(
+      userId,
+      { name: 'Shared.md', folderId: folder.id },
+      'workspace-access-document',
+    );
+    await prisma.$executeRaw`
+      INSERT INTO DocumentAccess
+        (documentId, userId, role, grantedById, createdAt, updatedAt)
+      VALUES
+        (${created.id}, ${editorId}, 'EDITOR', ${userId}, NOW(3), NOW(3)),
+        (${created.id}, ${viewerId}, 'VIEWER', ${userId}, NOW(3), NOW(3))
+    `;
+
+    const editorDocument = await workspaceService.getDocument(
+      editorId,
+      created.id,
+    );
+    expect(editorDocument).toMatchObject({
+      id: created.id,
+      folderId: null,
+      permission: 'editor',
+    });
+    const editorSave = await workspaceService.saveDocument(
+      editorId,
+      created.id,
+      {
+        baseRevisionId: editorDocument.currentRevision.id,
+        content: '# Edited together\n',
+      },
+      'workspace-access-editor-save',
+    );
+    expect(editorSave.currentRevision.ordinal).toBe(2);
+
+    const viewerDocument = await workspaceService.getDocument(
+      viewerId,
+      created.id,
+    );
+    expect(viewerDocument).toMatchObject({
+      folderId: null,
+      permission: 'viewer',
+      content: '# Edited together\n',
+    });
+    await expect(
+      workspaceService.saveDocument(
+        viewerId,
+        created.id,
+        {
+          baseRevisionId: viewerDocument.currentRevision.id,
+          content: 'viewer mutation',
+        },
+        'workspace-access-viewer-save',
+      ),
+    ).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', statusCode: 404 });
   });
 });

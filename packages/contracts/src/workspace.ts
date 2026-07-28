@@ -69,6 +69,12 @@ export const saveDocumentRequestSchema = z
   })
   .strict();
 
+export const collaborativeCheckpointRequestSchema = z
+  .object({
+    saveMessage: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
 export const folderSchema = z
   .object({
     id: resourceIdSchema,
@@ -100,7 +106,7 @@ export const documentSummarySchema = z
 
 export const documentContentResponseSchema = documentSummarySchema
   .extend({
-    permission: z.literal('owner'),
+    permission: z.enum(['owner', 'editor', 'viewer']),
     content: z.string(),
   })
   .strict();
@@ -109,6 +115,29 @@ export const saveDocumentResponseSchema = z
   .object({
     documentId: resourceIdSchema,
     currentRevision: revisionSummarySchema,
+  })
+  .strict();
+
+export const collaborationTicketResponseSchema = z
+  .object({
+    ticket: z.string().min(40).max(200),
+    documentId: resourceIdSchema,
+    permission: z.enum(['owner', 'editor', 'viewer']),
+    websocketUrl: z.string().url(),
+    expiresAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const collaborationCheckpointResponseSchema = saveDocumentResponseSchema
+  .extend({
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+export const collaborationCheckpointEventSchema = revisionSummarySchema
+  .extend({
+    type: z.literal('checkpoint'),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 
@@ -141,11 +170,23 @@ export type UpdateFolderRequest = z.infer<typeof updateFolderRequestSchema>;
 export type CreateDocumentRequest = z.infer<typeof createDocumentRequestSchema>;
 export type UpdateDocumentRequest = z.infer<typeof updateDocumentRequestSchema>;
 export type SaveDocumentRequest = z.infer<typeof saveDocumentRequestSchema>;
+export type CollaborativeCheckpointRequest = z.infer<
+  typeof collaborativeCheckpointRequestSchema
+>;
 export type FolderDto = z.infer<typeof folderSchema>;
 export type DocumentSummaryDto = z.infer<typeof documentSummarySchema>;
 export type DocumentContentResponse = z.infer<
   typeof documentContentResponseSchema
 >;
 export type SaveDocumentResponse = z.infer<typeof saveDocumentResponseSchema>;
+export type CollaborationTicketResponse = z.infer<
+  typeof collaborationTicketResponseSchema
+>;
+export type CollaborationCheckpointEvent = z.infer<
+  typeof collaborationCheckpointEventSchema
+>;
+export type CollaborationCheckpointResponse = z.infer<
+  typeof collaborationCheckpointResponseSchema
+>;
 export type WorkspaceTreeResponse = z.infer<typeof workspaceTreeResponseSchema>;
 export type TrashResponse = z.infer<typeof trashResponseSchema>;

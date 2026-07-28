@@ -33,7 +33,8 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Editor actions: current read, save, permitted history read, and restore.
 - Viewer actions: current read only by default.
 - Revalidate access inside save/invitation transactions. Cached client data never grants rights.
-- Revocation takes effect immediately at the API. Future WebSocket rooms must also disconnect revoked users.
+- WebSocket authentication uses short-lived one-time tickets bound to the authenticated session, user, and document. Access is revalidated when each ticket is consumed.
+- Revocation takes effect immediately at the API. The collaboration gateway must also disconnect revoked users before public release.
 
 ## Markdown And Browser Security
 

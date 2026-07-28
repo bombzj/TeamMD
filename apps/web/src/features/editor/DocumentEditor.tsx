@@ -1,10 +1,31 @@
-import type { DocumentContentResponse } from '@mymd/contracts';
+import {
+  collaborationCheckpointEventSchema,
+  type CollaborationCheckpointEvent,
+  type DocumentContentResponse,
+} from '@mymd/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, Check, Save } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Cloud,
+  CloudOff,
+  Eye,
+  Save,
+  Users,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type Vditor from 'vditor';
 
-import { ApiClientError, loadDocument, saveDocument } from '../../lib/api.js';
+import {
+  ApiClientError,
+  checkpointCollaboration,
+  createCollaborationTicket,
+  loadDocument,
+} from '../../lib/api.js';
+import {
+  createCollaborativeEditor,
+  type CollaborativeEditor,
+  type CollaborationTransport,
+} from './collaborative-editor.js';
 
 type DocumentEditorProps = {
   documentId: string;
@@ -13,20 +34,23 @@ type DocumentEditorProps = {
 
 export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const queryClient = useQueryClient();
-  const editorRef = useRef<Vditor | null>(null);
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const baseRevisionIdRef = useRef('');
+  const editorHostRef = useRef<HTMLDivElement | null>(null);
+  const previewHostRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<CollaborativeEditor | null>(null);
   const savedContentRef = useRef('');
   const initialDocumentRef = useRef<DocumentContentResponse | null>(null);
   const initialDocumentIdRef = useRef(documentId);
+  const [content, setContent] = useState('');
   const [dirty, setDirty] = useState(false);
   const [revisionOrdinal, setRevisionOrdinal] = useState(0);
-  const [conflict, setConflict] = useState(false);
+  const [transport, setTransport] =
+    useState<CollaborationTransport>('connecting');
   const [notice, setNotice] = useState<string | null>(null);
   const documentQuery = useQuery({
     queryKey: ['documents', documentId],
     queryFn: () => loadDocument(documentId),
   });
+
   if (initialDocumentIdRef.current !== documentId) {
     initialDocumentIdRef.current = documentId;
     initialDocumentRef.current = null;
@@ -34,98 +58,119 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   if (initialDocumentRef.current === null && documentQuery.data !== undefined) {
     initialDocumentRef.current = documentQuery.data;
   }
+  const readOnly = documentQuery.data?.permission === 'viewer';
+
+  const applyCheckpoint = (checkpoint: CollaborationCheckpointEvent) => {
+    const currentContent = editorRef.current?.getContent() ?? '';
+    void contentMatchesHash(currentContent, checkpoint.contentHash).then(
+      (matches) => {
+        if (!matches) return;
+        savedContentRef.current = currentContent;
+        setDirty(editorRef.current?.getContent() !== currentContent);
+        queryClient.setQueryData<DocumentContentResponse>(
+          ['documents', documentId],
+          (current) =>
+            current === undefined
+              ? current
+              : {
+                  ...current,
+                  content: currentContent,
+                  currentRevision: {
+                    id: checkpoint.id,
+                    ordinal: checkpoint.ordinal,
+                    createdAt: checkpoint.createdAt,
+                  },
+                },
+        );
+      },
+    );
+    setRevisionOrdinal(checkpoint.ordinal);
+    setNotice('Saved');
+    queryClient.setQueryData<DocumentContentResponse>(
+      ['documents', documentId],
+      (current) =>
+        current === undefined
+          ? current
+          : {
+              ...current,
+              currentRevision: {
+                id: checkpoint.id,
+                ordinal: checkpoint.ordinal,
+                createdAt: checkpoint.createdAt,
+              },
+            },
+    );
+    void queryClient.invalidateQueries({ queryKey: ['workspace', 'tree'] });
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const editor = editorRef.current;
       if (editor === null) throw new Error('The editor is not ready.');
-      return saveDocument(documentId, {
-        baseRevisionId: baseRevisionIdRef.current,
-        content: editor.getValue(),
-      });
+      await editor.prepareCheckpoint();
+      return checkpointCollaboration(documentId);
     },
-    onSuccess: async (result) => {
-      const content = editorRef.current?.getValue() ?? savedContentRef.current;
-      baseRevisionIdRef.current = result.currentRevision.id;
-      savedContentRef.current = content;
-      setRevisionOrdinal(result.currentRevision.ordinal);
-      setDirty(false);
-      setConflict(false);
-      setNotice('Saved');
-      queryClient.setQueryData<DocumentContentResponse>(
-        ['documents', documentId],
-        (current) =>
-          current === undefined
-            ? current
-            : { ...current, content, currentRevision: result.currentRevision },
+    onSuccess: (result) => {
+      applyCheckpoint(
+        collaborationCheckpointEventSchema.parse({
+          type: 'checkpoint',
+          ...result.currentRevision,
+          contentHash: result.contentHash,
+        }),
       );
-      await queryClient.invalidateQueries({ queryKey: ['workspace', 'tree'] });
     },
-    onError: (error) => {
-      if (
-        error instanceof ApiClientError &&
-        error.code === 'REVISION_CONFLICT'
-      ) {
-        setConflict(true);
-        setNotice(null);
-        return;
-      }
-      setNotice(messageFor(error));
-    },
+    onError: (error) => setNotice(messageFor(error)),
   });
 
   useEffect(() => {
     const initial = initialDocumentRef.current;
-    if (initial === null || hostRef.current === null) return;
+    const editorHost = editorHostRef.current;
+    const previewHost = previewHostRef.current;
+    if (initial === null || editorHost === null || previewHost === null) return;
     let active = true;
-    let editor: Vditor | null = null;
-    baseRevisionIdRef.current = initial.currentRevision.id;
-    savedContentRef.current = initial.content;
-    setRevisionOrdinal(initial.currentRevision.ordinal);
+    let editor: CollaborativeEditor | null = null;
 
-    void import('vditor').then(({ default: VditorConstructor }) => {
-      if (!active || hostRef.current === null) return;
-      editor = new VditorConstructor(hostRef.current, {
-        value: initial.content,
-        cdn: '/vditor',
-        cache: { enable: false },
-        lang: 'en_US',
-        mode: 'ir',
-        minHeight: 420,
-        placeholder: 'Start writing in Markdown...',
-        toolbar: [
-          'headings',
-          'bold',
-          'italic',
-          'strike',
-          'link',
-          '|',
-          'list',
-          'ordered-list',
-          'check',
-          'quote',
-          'code',
-          'inline-code',
-          'table',
-          '|',
-          'undo',
-          'redo',
-          '|',
-          'preview',
-          'fullscreen',
-        ],
-        preview: {
-          markdown: { sanitize: true },
-          theme: { current: 'light' },
-        },
-        input: (value) => {
-          setDirty(value !== savedContentRef.current);
-          setNotice(null);
-        },
-        after: () => {
-          if (editor !== null) editorRef.current = editor;
-        },
-      });
-    });
+    savedContentRef.current = initial.content;
+    setContent(initial.content);
+    setDirty(false);
+    setRevisionOrdinal(initial.currentRevision.ordinal);
+    setTransport('connecting');
+    setNotice(null);
+
+    void createCollaborativeEditor({
+      documentId,
+      editorHost,
+      previewHost,
+      readOnly: initial.permission === 'viewer',
+      initialContent: initial.content,
+      createTicket: () => createCollaborationTicket(documentId),
+      onCheckpoint: applyCheckpoint,
+      onContentChange: (nextContent) => {
+        if (!active) return;
+        setContent(nextContent);
+        setDirty(nextContent !== savedContentRef.current);
+        setNotice(null);
+      },
+      onError: (message) => {
+        if (active) setNotice(message);
+      },
+      onTransportChange: (nextTransport) => {
+        if (!active) return;
+        setTransport(nextTransport);
+      },
+    }).then(
+      (createdEditor) => {
+        if (!active) {
+          createdEditor.destroy();
+          return;
+        }
+        editor = createdEditor;
+        editorRef.current = createdEditor;
+      },
+      (error) => {
+        if (active) setNotice(messageFor(error));
+      },
+    );
 
     return () => {
       active = false;
@@ -148,28 +193,25 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     const saveShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        if (dirty && !saveMutation.isPending) saveMutation.mutate();
+        if (
+          dirty &&
+          transport === 'synced' &&
+          !readOnly &&
+          !saveMutation.isPending
+        ) {
+          saveMutation.mutate();
+        }
       }
     };
     window.addEventListener('keydown', saveShortcut);
     return () => window.removeEventListener('keydown', saveShortcut);
-  }, [dirty, saveMutation]);
+  }, [dirty, readOnly, saveMutation, transport]);
 
   const close = () => {
-    if (dirty && !window.confirm('Discard your unsaved changes?')) return;
+    if (dirty && !window.confirm('Leave with changes not saved to history?')) {
+      return;
+    }
     onClose();
-  };
-
-  const reloadServerVersion = async () => {
-    const latest = await loadDocument(documentId);
-    editorRef.current?.setValue(latest.content, true);
-    queryClient.setQueryData(['documents', documentId], latest);
-    baseRevisionIdRef.current = latest.currentRevision.id;
-    savedContentRef.current = latest.content;
-    setRevisionOrdinal(latest.currentRevision.ordinal);
-    setDirty(false);
-    setConflict(false);
-    setNotice('Server version loaded');
   };
 
   if (documentQuery.isPending) {
@@ -188,6 +230,9 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     );
   }
 
+  const canSave =
+    dirty && transport === 'synced' && !readOnly && !saveMutation.isPending;
+
   return (
     <main className="document-editor-shell">
       <header className="editor-heading">
@@ -202,62 +247,84 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             <ArrowLeft size={19} />
           </button>
           <div>
-            <p className="eyebrow">Markdown document</p>
+            <p className="eyebrow">
+              {readOnly
+                ? 'Shared document · View only'
+                : 'Shared Markdown document'}
+            </p>
             <h1>{documentQuery.data.name}</h1>
           </div>
         </div>
         <div className="editor-save-area">
+          <TransportState transport={transport} />
           <span className={`save-state ${dirty ? 'dirty' : ''}`}>
-            {notice === 'Saved' ? <Check size={15} /> : null}
-            {notice ??
-              (dirty ? 'Unsaved changes' : `Revision ${revisionOrdinal}`)}
+            {!dirty && notice === 'Saved' ? <Check size={15} /> : null}
+            {saveMutation.isPending
+              ? 'Saving...'
+              : dirty
+                ? 'Not saved to history'
+                : `Revision ${revisionOrdinal}`}
           </span>
-          <button
-            className="primary-action compact-action"
-            type="button"
-            disabled={
-              !dirty || saveMutation.isPending || editorRef.current === null
-            }
-            onClick={() => saveMutation.mutate()}
-          >
-            <Save size={17} /> {saveMutation.isPending ? 'Saving...' : 'Save'}
-          </button>
+          {!readOnly && (
+            <button
+              className="primary-action compact-action"
+              type="button"
+              disabled={!canSave}
+              onClick={() => saveMutation.mutate()}
+            >
+              <Save size={17} /> {saveMutation.isPending ? 'Saving...' : 'Save'}
+            </button>
+          )}
         </div>
       </header>
-      {conflict && (
-        <section className="revision-conflict" role="alert">
-          <AlertTriangle size={20} />
-          <div>
-            <strong>A newer revision is already saved.</strong>
-            <p>
-              Your local draft is still here. Reload the server version to
-              continue from the latest revision.
-            </p>
-          </div>
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => void reloadServerVersion()}
-          >
-            Reload server version
-          </button>
-        </section>
+      {notice !== null && notice !== 'Saved' && (
+        <div className="editor-error" role="alert">
+          {notice}
+        </div>
       )}
-      {notice !== null &&
-        notice !== 'Saved' &&
-        notice !== 'Server version loaded' && (
-          <div className="editor-error" role="alert">
-            {notice}
+      <section
+        className="editor-canvas"
+        aria-label="Collaborative Markdown editor"
+      >
+        <div className="editor-pane">
+          <div className="pane-heading">
+            <Users size={15} /> Editor
           </div>
-        )}
-      <section className="editor-canvas" aria-label="Markdown editor">
-        <div ref={hostRef} />
+          <div ref={editorHostRef} className="codemirror-host" />
+        </div>
+        <div className="preview-pane">
+          <div className="pane-heading">
+            <Eye size={15} /> Preview
+          </div>
+          <div ref={previewHostRef} className="vditor-preview vditor-reset" />
+        </div>
       </section>
       <footer className="editor-footer">
         <span>Revision {revisionOrdinal}</span>
-        <span>{dirty ? 'Local draft' : 'Saved to history'}</span>
+        <span>{content.length.toLocaleString()} characters</span>
+        <span>
+          {readOnly ? 'View only' : dirty ? 'Shared draft' : 'Saved to history'}
+        </span>
       </footer>
     </main>
+  );
+}
+
+function TransportState({ transport }: { transport: CollaborationTransport }) {
+  const connected = transport === 'synced' || transport === 'connected';
+  const label =
+    transport === 'synced'
+      ? 'Synced'
+      : transport === 'connected'
+        ? 'Synchronizing'
+        : transport === 'connecting'
+          ? 'Connecting'
+          : 'Offline';
+  return (
+    <span className={`transport-state ${connected ? 'connected' : ''}`}>
+      {connected ? <Cloud size={15} /> : <CloudOff size={15} />}
+      {label}
+    </span>
   );
 }
 
@@ -277,7 +344,22 @@ function EditorStatus({
   );
 }
 
+async function contentMatchesHash(
+  content: string,
+  expectedHash: string,
+): Promise<boolean> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(content),
+  );
+  const actualHash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+  return actualHash === expectedHash;
+}
+
 function messageFor(error: unknown): string {
   if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
   return 'The document could not be loaded.';
 }

@@ -2,7 +2,7 @@
 
 ## Context
 
-MyMD is a browser application backed by a versioned HTTP API and MySQL. The MVP uses explicit document saves with optimistic concurrency. It supports multiple people editing the same shared document over time, but not simultaneous character-level synchronization.
+MyMD is a browser application backed by a versioned HTTP API and MySQL. Explicit immutable saves remain the history model. A separate Yjs collaboration boundary is being introduced incrementally for simultaneous character-level synchronization.
 
 ```mermaid
 flowchart LR
@@ -161,6 +161,6 @@ Every request receives a request ID. Structured logs include route template, sta
 
 Document content, passwords, cookies, CSRF values, invitation tokens, raw email bodies, and full request payloads are never logged.
 
-## Evolution To Real-Time
+## Real-Time Collaboration
 
-Real-time collaboration is an additive boundary, not an altered meaning of the save endpoint. A future collaboration module can authenticate WebSocket upgrades, authorize Yjs rooms, persist CRDT updates, and materialize immutable Markdown checkpoints. Presence remains ephemeral. Explicit revision history, revocation, export, and conflict recovery stay supported throughout migration.
+Real-time collaboration is an additive boundary, not an altered meaning of the save endpoint. The collaboration module authenticates WebSocket upgrades with short-lived one-time tickets, authorizes Yjs rooms through the same document policy as HTTP, persists CRDT updates, and materializes immutable Markdown checkpoints on explicit Save. CodeMirror is the writable Yjs-bound source editor and Vditor renders sanitized preview. Presence remains ephemeral. Explicit revision history, revocation, export, and conflict recovery remain supported throughout migration. See ADR 0002.
