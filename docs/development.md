@@ -1,0 +1,92 @@
+# Development Guide
+
+The repository is under active implementation. Phase 0 adds the Prisma schema, lint configuration, and runnable apps incrementally.
+
+## Prerequisites
+
+- Node.js 22 LTS or newer supported 22.x release
+- pnpm 10 through Corepack
+- MySQL 8.4 with an empty development schema
+
+Enable the pinned package manager:
+
+```powershell
+corepack enable
+corepack prepare pnpm@10.13.1 --activate
+```
+
+## Local Configuration
+
+Use `.env.local` for workstation settings. It is ignored by Git. Start from `.env.example` on a new machine and set a complete Prisma MySQL URL:
+
+```text
+DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/mymd
+```
+
+URL-encode reserved characters in username/password. Do not use a production credential, commit the file, or print it in diagnostics. Use a non-root MySQL account with privileges limited to the local `mymd` schema.
+
+`DATABASE_URL` is Prisma's connection source. The individual `MYSQL_*` fields are available to local tooling and must describe the same database.
+
+## Bootstrap
+
+```powershell
+pnpm install
+pnpm --filter @mymd/api prisma:generate
+pnpm --filter @mymd/api prisma:migrate
+pnpm dev
+```
+
+Local endpoints are web `http://localhost:5173` and API `http://localhost:3000`.
+
+## Commands
+
+| Command                        | Purpose                                |
+| ------------------------------ | -------------------------------------- |
+| `pnpm dev`                     | Run workspace development processes    |
+| `pnpm build`                   | Build all packages in dependency order |
+| `pnpm typecheck`               | Typecheck all packages                 |
+| `pnpm lint`                    | Lint all packages                      |
+| `pnpm test`                    | Run package tests                      |
+| `pnpm format:check`            | Check formatting                       |
+| `pnpm --filter @mymd/api test` | Run API tests only                     |
+| `pnpm --filter @mymd/web test` | Run web tests only                     |
+
+Prefer the narrowest package command while iterating, followed by root checks for cross-cutting changes.
+
+## Database Workflow
+
+1. Update `apps/api/prisma/schema.prisma` and the data-model documentation together.
+2. Generate a named migration against local MySQL.
+3. Review SQL for collation, indexes, foreign keys, locking, table rewrites, and destructive operations.
+4. Run migration and integration tests against a clean schema and an upgraded representative schema.
+5. Commit schema and migration together; never edit an already-applied shared migration.
+
+The local runtime account is intentionally unable to create Prisma shadow databases. Generate migration SQL for review with `prisma migrate diff`, check it into a timestamped migration directory, and apply it with `prisma migrate deploy`. If a separate development migration account is introduced later, it may use `prisma migrate dev` with an isolated shadow database. Never use `prisma db push` outside disposable experimentation.
+
+## Implementation Conventions
+
+- Keep route handlers thin: parse contract, call one use case, serialize contract.
+- Keep authorization and transaction logic in API domain services.
+- Pass explicit dependencies such as clock, token generator, hasher, email sender, and repositories to services where useful for deterministic tests.
+- Keep Vditor behind a React adapter that owns initialization, value transfer, resize, mode configuration, and teardown.
+- Use TanStack Query for server state. Keep unsaved editor content local and never overwrite dirty local state from a background refetch.
+- Use stable error codes and exhaustive client handling for save conflicts and authentication expiry.
+- Validate environment once at startup and fail with names of invalid variables, never their secret values.
+
+## Pull Request Checklist
+
+- Requirement and owning module are identified.
+- Shared contract changed before or with consumers.
+- Authorization and negative tests cover the changed action.
+- Persistence writes are atomic and migration implications are reviewed.
+- Logs and errors contain no content or secrets.
+- Accessibility behavior is tested for UI changes.
+- Relevant docs, `.env.example`, and ADRs are current.
+- Narrow tests, package typecheck/lint, and required root checks pass.
+
+## Troubleshooting Principles
+
+- Reproduce database behavior against MySQL, not an in-memory substitute.
+- Include request ID and stable error code in bug reports, but redact headers, cookies, tokens, email addresses, and Markdown content.
+- Do not “fix” a conflict by adding force overwrite. Confirm the submitted and current revision IDs and preserve both users' text.
+- If documentation and code disagree on authorization, saving, or retention, stop implementation and resolve the design discrepancy explicitly.
