@@ -14,6 +14,7 @@ const maximumYjsStateBytes = 8 * 1024 * 1024;
 
 export type CollaborationContext = {
   userId: string;
+  userEmail: string;
   sessionId: string;
   documentId: string;
   permission: DocumentContentResponse['permission'];
@@ -112,6 +113,7 @@ export class CollaborationService {
 
       return {
         userId: stored.userId,
+        userEmail: stored.session.user.email,
         sessionId: stored.sessionId,
         documentId,
         permission: access.permission,

@@ -51,10 +51,17 @@ export function createCollaborationServer(
       );
     },
     beforeHandleAwareness({ states, context }) {
+      const identity = collaborationIdentity(
+        context?.userId ?? 'unknown',
+        context?.userEmail ?? 'Unknown collaborator',
+      );
       for (const state of states.values()) {
         state.user = {
           id: context?.userId ?? 'unknown',
+          name: identity.name,
           permission: context?.permission ?? 'viewer',
+          color: identity.color,
+          colorLight: identity.colorLight,
         };
       }
       return Promise.resolve();
@@ -77,4 +84,19 @@ export function createCollaborationServer(
       return Promise.resolve();
     },
   });
+}
+
+function collaborationIdentity(userId: string, name: string) {
+  const colors = [
+    ['#a83c32', '#f8d9d4'],
+    ['#19705f', '#d3eee8'],
+    ['#76561b', '#f3e5bd'],
+    ['#315f89', '#d7e8f5'],
+  ] as const;
+  const index = [...userId].reduce(
+    (hash, character) => (hash * 31 + character.charCodeAt(0)) % colors.length,
+    0,
+  );
+  const [color, colorLight] = colors[index] ?? colors[0];
+  return { name, color, colorLight };
 }

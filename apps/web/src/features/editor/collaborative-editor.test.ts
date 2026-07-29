@@ -16,5 +16,6 @@ describe('collaborative editor selection styling', () => {
     expect(globalStyles).toContain('.codemirror-host .cm-content ::selection');
     expect(globalStyles).toContain('.cm-selectionBackground');
     expect(globalStyles).toContain('background: #9bc9e9');
+    expect(globalStyles).toContain('background: rgba(244, 240, 231, 0.42)');
   });
 });

@@ -30,6 +30,7 @@ export class CollaborationCheckpointService {
       documentId,
       {
         userId,
+        userEmail: 'System checkpoint',
         sessionId: 'http-checkpoint',
         documentId,
         permission: 'editor',
@@ -93,6 +94,7 @@ export class CollaborationCheckpointService {
       documentId,
       {
         userId,
+        userEmail: 'System restore',
         sessionId: 'http-restore',
         documentId,
         permission: 'editor',

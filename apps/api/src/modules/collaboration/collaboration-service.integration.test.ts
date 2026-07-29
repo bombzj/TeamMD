@@ -105,6 +105,7 @@ describe('CollaborationService with MySQL', () => {
     );
     expect(ownerContext).toMatchObject({
       userId: ownerId,
+      userEmail: testEmail,
       documentId: created.id,
       permission: 'owner',
       readOnly: false,
@@ -127,6 +128,7 @@ describe('CollaborationService with MySQL', () => {
       created.id,
     );
     expect(viewerContext).toMatchObject({
+      userEmail: `viewer-${testEmail}`,
       permission: 'viewer',
       readOnly: true,
     });

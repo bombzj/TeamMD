@@ -15,6 +15,12 @@ import type {
 
 const roomName = 'cm1234567890documentabcde';
 const webOrigin = 'http://localhost:5173';
+type AwarenessState = Record<string, unknown>;
+type AwarenessUser = {
+  id: string;
+  name: string;
+  permission: string;
+};
 const config: ServerConfig = {
   nodeEnv: 'test',
   host: '127.0.0.1',
@@ -49,6 +55,7 @@ class InMemoryCollaborationService {
     const readOnly = ticket === 'viewer';
     return Promise.resolve({
       userId: ticket,
+      userEmail: `${ticket}@example.test`,
       sessionId: `session-${ticket}`,
       documentId,
       permission: readOnly ? 'viewer' : 'editor',
@@ -90,6 +97,25 @@ describe('collaboration gateway', () => {
         waitForSync(writerA, 'writer A sync'),
         waitForSync(writerB, 'writer B sync'),
       ]);
+
+      writerA.setAwarenessField('user', { name: 'Spoofed client name' });
+      await waitForAwareness(
+        writerB,
+        (state) => readAwarenessUser(state)?.name === 'writer-a@example.test',
+        'trusted writer A identity',
+      );
+      const writerAState = [...writerB.awareness!.getStates().values()].find(
+        (state: AwarenessState) => readAwarenessUser(state)?.id === 'writer-a',
+      );
+      expect(
+        writerAState === undefined
+          ? undefined
+          : readAwarenessUser(writerAState),
+      ).toMatchObject({
+        id: 'writer-a',
+        name: 'writer-a@example.test',
+        permission: 'editor',
+      });
 
       writerA.document.getText('content').insert(0, 'Alpha ');
       writerB.document.getText('content').insert(0, 'Beta ');
@@ -174,6 +200,44 @@ function waitForDocument(
     };
     document.on('update', handleUpdate);
   });
+}
+
+function waitForAwareness(
+  provider: HocuspocusProvider,
+  predicate: (state: AwarenessState) => boolean,
+  label: string,
+): Promise<void> {
+  const awareness = provider.awareness;
+  if (awareness === null) throw new Error('Awareness is unavailable.');
+  if ([...awareness.getStates().values()].some(predicate)) {
+    return Promise.resolve();
+  }
+  return withTimeout<void>(label, (resolve) => {
+    const handleChange = () => {
+      if (![...awareness.getStates().values()].some(predicate)) return;
+      awareness.off('change', handleChange);
+      resolve();
+    };
+    awareness.on('change', handleChange);
+  });
+}
+
+function readAwarenessUser(state: AwarenessState): AwarenessUser | undefined {
+  const user = state.user;
+  if (typeof user !== 'object' || user === null) return undefined;
+  const candidate = user as Record<string, unknown>;
+  if (
+    typeof candidate.id !== 'string' ||
+    typeof candidate.name !== 'string' ||
+    typeof candidate.permission !== 'string'
+  ) {
+    return undefined;
+  }
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    permission: candidate.permission,
+  };
 }
 
 function waitForOutgoingUpdate(
