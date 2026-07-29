@@ -1211,6 +1211,17 @@ select:focus-visible {
   padding: 0 clamp(18px, 3vw, 38px);
   caret-color: var(--red-dark);
 }
+.codemirror-host .cm-content ::selection {
+  color: var(--ink);
+  background: #9bc9e9;
+}
+.codemirror-host
+  .cm-editor.cm-focused
+  > .cm-scroller
+  > .cm-selectionLayer
+  .cm-selectionBackground {
+  background: #9bc9e9;
+}
 .codemirror-host .cm-lineNumbers {
   color: #aaa59a;
 }
