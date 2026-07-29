@@ -14,6 +14,7 @@ import { AuthService } from './modules/auth/auth-service.js';
 import { registerAuthRoutes } from './modules/auth/auth-routes.js';
 import './modules/auth/auth-types.js';
 import { registerWorkspaceRoutes } from './modules/workspace/workspace-routes.js';
+import { SharingService } from './modules/workspace/sharing-service.js';
 import { WorkspaceService } from './modules/workspace/workspace-service.js';
 
 type BuildAppOptions = {
@@ -22,6 +23,8 @@ type BuildAppOptions = {
   authService?: AuthService;
   collaborationCheckpointService?: CollaborationCheckpointService;
   collaborationService?: CollaborationService;
+  closeCollaborationConnections?: (documentId: string) => void;
+  sharingService?: SharingService;
   workspaceService?: WorkspaceService;
 };
 
@@ -105,6 +108,10 @@ export async function buildApp(
           options.collaborationService ??
           new CollaborationService(options.prisma),
         collaborationWebsocketUrl: options.config.collaborationUrl,
+        closeCollaborationConnections:
+          options.closeCollaborationConnections ?? (() => undefined),
+        sharingService:
+          options.sharingService ?? new SharingService(options.prisma),
         webOrigin: options.config.webOrigin,
         workspaceService:
           options.workspaceService ?? new WorkspaceService(options.prisma),

@@ -28,6 +28,8 @@ const app = await buildApp({
   prisma,
   collaborationCheckpointService,
   collaborationService,
+  closeCollaborationConnections: (documentId) =>
+    collaborationServer.hocuspocus.closeConnections(documentId),
   workspaceService,
 });
 

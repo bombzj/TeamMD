@@ -33,6 +33,9 @@ type CollaborativeEditorOptions = {
   onCheckpoint: (checkpoint: CollaborationCheckpointEvent) => void;
   onContentChange: (content: string) => void;
   onError: (message: string) => void;
+  onPermissionChange: (
+    permission: CollaborationTicketResponse['permission'],
+  ) => void;
   onTransportChange: (transport: CollaborationTransport) => void;
 };
 
@@ -46,6 +49,7 @@ export async function createCollaborativeEditor(
   options: CollaborativeEditorOptions,
 ): Promise<CollaborativeEditor> {
   const initialTicket = await options.createTicket();
+  let readOnly = initialTicket.permission === 'viewer';
   let nextTicket: CollaborationTicketResponse | null = initialTicket;
   let previewTimer: ReturnType<typeof setTimeout> | undefined;
   let destroyed = false;
@@ -60,6 +64,11 @@ export async function createCollaborativeEditor(
     token: async () => {
       const ticket = nextTicket ?? (await options.createTicket());
       nextTicket = null;
+      readOnly = ticket.permission === 'viewer';
+      options.onPermissionChange(ticket.permission);
+      view?.dispatch({
+        effects: editing.reconfigure(editingExtensions(true)),
+      });
       return ticket.ticket;
     },
     flushDelay: 100,
@@ -74,7 +83,7 @@ export async function createCollaborativeEditor(
     onSynced: ({ state }) => {
       if (!state) return;
       view?.dispatch({
-        effects: editing.reconfigure(editingExtensions(options.readOnly)),
+        effects: editing.reconfigure(editingExtensions(readOnly)),
       });
       options.onTransportChange('synced');
       options.onContentChange(yText.toJSON());
@@ -95,7 +104,7 @@ export async function createCollaborativeEditor(
   });
   provider.setAwarenessField('user', collaborationIdentity());
 
-  const undoManager = options.readOnly ? false : new Y.UndoManager(yText);
+  const undoManager = new Y.UndoManager(yText);
   const state = EditorState.create({
     doc: yText.toJSON(),
     extensions: [
@@ -140,6 +149,9 @@ export async function createCollaborativeEditor(
   return {
     getContent: () => yText.toJSON(),
     prepareCheckpoint: async () => {
+      if (readOnly) {
+        throw new Error('You no longer have permission to save this document.');
+      }
       if (!provider.synced) {
         throw new Error('Reconnect before saving this document.');
       }

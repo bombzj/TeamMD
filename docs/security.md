@@ -29,12 +29,12 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 
 - Enforce access in domain services for every document query and mutation. Route guards provide authentication context, not complete authorization.
 - Query by actor and permission where possible to avoid time-of-check/time-of-use gaps and ID enumeration.
-- Owner-only actions: hierarchy changes, trash/permanent delete, invite, role change, and revoke.
+- Owner-only actions: hierarchy changes, trash/permanent delete, grant, role change, and revoke.
 - Editor actions: current read, save, permitted history read, and restore.
 - Viewer actions: current read only by default.
-- Revalidate access inside save/invitation transactions. Cached client data never grants rights.
+- Revalidate access inside save and sharing transactions. Cached client data never grants rights.
 - WebSocket authentication uses short-lived one-time tickets bound to the authenticated session, user, and document. Access is revalidated when each ticket is consumed.
-- Revocation takes effect immediately at the API. The collaboration gateway must also disconnect revoked users before public release.
+- Grant, role change, and revocation close the active document room. Every reconnect requires a fresh ticket and current API authorization, so revoked users cannot retain an already-open socket.
 
 ## Markdown And Browser Security
 

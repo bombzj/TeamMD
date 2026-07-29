@@ -1,5 +1,7 @@
 import {
   collaborationTicketResponseSchema,
+  collaboratorListResponseSchema,
+  collaboratorSchema,
   documentContentResponseSchema,
   documentSummarySchema,
   errorResponseSchema,
@@ -19,6 +21,7 @@ import type { AuthService } from '../auth/auth-service.js';
 import type { AuthenticatedSession } from '../auth/auth-types.js';
 import type { CollaborationCheckpointService } from '../collaboration/collaboration-checkpoint-service.js';
 import type { CollaborationService } from '../collaboration/collaboration-service.js';
+import type { SharingService } from './sharing-service.js';
 import type { WorkspaceService } from './workspace-service.js';
 
 const config: ServerConfig = {
@@ -127,6 +130,26 @@ class FakeCollaborationCheckpointService {
     contentHash:
       '5a20c83155116d212e04cd1301b39da22c04944de6c80fb6f17c1db0a9b037fc',
   });
+}
+
+const collaborator = {
+  userId: 'cm1234567890collaboratorab',
+  email: 'collaborator@example.test',
+  role: 'editor' as const,
+  createdAt: '2026-07-27T12:00:00.000Z',
+  updatedAt: '2026-07-27T12:00:00.000Z',
+};
+
+class FakeSharingService {
+  public listSharedDocuments = vi.fn().mockResolvedValue({
+    documents: [{ ...document, folderId: null, permission: 'editor' }],
+  });
+  public listCollaborators = vi
+    .fn()
+    .mockResolvedValue({ collaborators: [collaborator] });
+  public grantAccess = vi.fn().mockResolvedValue(collaborator);
+  public updateRole = vi.fn().mockResolvedValue(collaborator);
+  public revokeAccess = vi.fn().mockResolvedValue(undefined);
 }
 
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
@@ -350,12 +373,90 @@ describe('workspace routes', () => {
       expect.any(String),
     );
   });
+
+  it('lists collaborators and grants access with room invalidation', async () => {
+    const sharingService = new FakeSharingService();
+    const closeConnections = vi.fn();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      new FakeCollaborationService(),
+      new FakeCollaborationCheckpointService(),
+      sharingService,
+      closeConnections,
+    );
+    const listResponse = await app.inject({
+      method: 'GET',
+      url: `/api/v1/documents/${document.id}/collaborators`,
+      headers: authHeaders(false),
+    });
+    const grantResponse = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/collaborators`,
+      headers: authHeaders(),
+      payload: { email: collaborator.email, role: 'editor' },
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(collaboratorListResponseSchema.parse(listResponse.json())).toEqual({
+      collaborators: [collaborator],
+    });
+    expect(grantResponse.statusCode).toBe(201);
+    expect(collaboratorSchema.parse(grantResponse.json())).toEqual(
+      collaborator,
+    );
+    expect(sharingService.grantAccess).toHaveBeenCalledWith(
+      userId,
+      document.id,
+      collaborator.email,
+      'editor',
+      expect.any(String),
+    );
+    expect(closeConnections).toHaveBeenCalledWith(document.id);
+  });
+
+  it('requires CSRF and invalidates the room after role change or revoke', async () => {
+    const sharingService = new FakeSharingService();
+    const closeConnections = vi.fn();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      new FakeCollaborationService(),
+      new FakeCollaborationCheckpointService(),
+      sharingService,
+      closeConnections,
+    );
+    const rejected = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/documents/${document.id}/collaborators/${collaborator.userId}`,
+      headers: authHeaders(false),
+      payload: { role: 'viewer' },
+    });
+    const changed = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/documents/${document.id}/collaborators/${collaborator.userId}`,
+      headers: authHeaders(),
+      payload: { role: 'viewer' },
+    });
+    const revoked = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/documents/${document.id}/collaborators/${collaborator.userId}`,
+      headers: authHeaders(),
+    });
+
+    expect(rejected.statusCode).toBe(403);
+    expect(changed.statusCode).toBe(200);
+    expect(revoked.statusCode).toBe(204);
+    expect(sharingService.updateRole).toHaveBeenCalledOnce();
+    expect(sharingService.revokeAccess).toHaveBeenCalledOnce();
+    expect(closeConnections).toHaveBeenCalledTimes(2);
+  });
 });
 
 async function createTestApp(
   service = new FakeWorkspaceService(),
   collaborationService = new FakeCollaborationService(),
   collaborationCheckpointService = new FakeCollaborationCheckpointService(),
+  sharingService = new FakeSharingService(),
+  closeCollaborationConnections = vi.fn(),
 ) {
   const prisma = {
     $queryRaw: vi.fn().mockResolvedValue([{ result: 1 }]),
@@ -368,6 +469,8 @@ async function createTestApp(
       collaborationCheckpointService as unknown as CollaborationCheckpointService,
     collaborationService:
       collaborationService as unknown as CollaborationService,
+    closeCollaborationConnections,
+    sharingService: sharingService as unknown as SharingService,
     workspaceService: service as unknown as WorkspaceService,
   });
   apps.push(app);

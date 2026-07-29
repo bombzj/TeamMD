@@ -69,7 +69,7 @@ function WorkspaceShell({
   auth: AuthResponse;
   onLogout: () => Promise<void>;
 }) {
-  const [view, setView] = useState<'files' | 'trash'>('files');
+  const [view, setView] = useState<'files' | 'shared' | 'trash'>('files');
   const [createDocumentRequest, setCreateDocumentRequest] = useState(0);
 
   return (
@@ -117,7 +117,11 @@ function WorkspaceShell({
             >
               <Folder size={17} /> My files
             </button>
-            <button className="nav-row" type="button" disabled>
+            <button
+              className={`nav-row ${view === 'shared' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setView('shared')}
+            >
               <Users size={17} /> Shared with me
             </button>
             <button

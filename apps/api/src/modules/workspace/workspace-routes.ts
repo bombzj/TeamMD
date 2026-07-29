@@ -2,6 +2,8 @@ import {
   collaborationCheckpointResponseSchema,
   collaborativeCheckpointRequestSchema,
   collaborationTicketResponseSchema,
+  collaboratorListResponseSchema,
+  collaboratorSchema,
   createDocumentRequestSchema,
   createFolderRequestSchema,
   documentContentResponseSchema,
@@ -10,9 +12,12 @@ import {
   permanentDeleteRequestSchema,
   saveDocumentRequestSchema,
   saveDocumentResponseSchema,
+  shareDocumentRequestSchema,
+  sharedDocumentListResponseSchema,
   trashResponseSchema,
   updateDocumentRequestSchema,
   updateFolderRequestSchema,
+  updateCollaboratorRequestSchema,
   workspaceTreeResponseSchema,
 } from '@mymd/contracts';
 import type { FastifyInstance } from 'fastify';
@@ -22,6 +27,7 @@ import { requireMutationAuth, requireSession } from '../auth/auth-guards.js';
 import type { AuthService } from '../auth/auth-service.js';
 import type { CollaborationCheckpointService } from '../collaboration/collaboration-checkpoint-service.js';
 import type { CollaborationService } from '../collaboration/collaboration-service.js';
+import type { SharingService } from './sharing-service.js';
 import type { WorkspaceService } from './workspace-service.js';
 
 type WorkspaceRouteOptions = {
@@ -29,6 +35,8 @@ type WorkspaceRouteOptions = {
   collaborationCheckpointService?: CollaborationCheckpointService;
   collaborationService: CollaborationService;
   collaborationWebsocketUrl: string;
+  closeCollaborationConnections: (documentId: string) => void;
+  sharingService: SharingService;
   webOrigin: string;
   workspaceService: WorkspaceService;
 };
@@ -44,6 +52,86 @@ export function registerWorkspaceRoutes(
       .header('Cache-Control', 'no-store')
       .send(workspaceTreeResponseSchema.parse(result));
   });
+
+  app.get('/shared-with-me', async (request, reply) => {
+    const session = requireSession(request);
+    const result = await options.sharingService.listSharedDocuments(
+      session.user.id,
+    );
+    return reply
+      .header('Cache-Control', 'no-store')
+      .send(sharedDocumentListResponseSchema.parse(result));
+  });
+
+  app.get<{ Params: { documentId: string } }>(
+    '/documents/:documentId/collaborators',
+    async (request, reply) => {
+      const session = requireSession(request);
+      const result = await options.sharingService.listCollaborators(
+        session.user.id,
+        request.params.documentId,
+      );
+      return reply
+        .header('Cache-Control', 'no-store')
+        .send(collaboratorListResponseSchema.parse(result));
+    },
+  );
+
+  app.post<{ Params: { documentId: string } }>(
+    '/documents/:documentId/collaborators',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      const body = shareDocumentRequestSchema.parse(request.body);
+      const result = await options.sharingService.grantAccess(
+        session.user.id,
+        request.params.documentId,
+        body.email,
+        body.role,
+        request.id,
+      );
+      options.closeCollaborationConnections(request.params.documentId);
+      return reply.status(201).send(collaboratorSchema.parse(result));
+    },
+  );
+
+  app.patch<{
+    Params: { documentId: string; collaboratorId: string };
+  }>(
+    '/documents/:documentId/collaborators/:collaboratorId',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      const body = updateCollaboratorRequestSchema.parse(request.body);
+      const result = await options.sharingService.updateRole(
+        session.user.id,
+        request.params.documentId,
+        request.params.collaboratorId,
+        body.role,
+        request.id,
+      );
+      options.closeCollaborationConnections(request.params.documentId);
+      return reply.send(collaboratorSchema.parse(result));
+    },
+  );
+
+  app.delete<{
+    Params: { documentId: string; collaboratorId: string };
+  }>(
+    '/documents/:documentId/collaborators/:collaboratorId',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      await options.sharingService.revokeAccess(
+        session.user.id,
+        request.params.documentId,
+        request.params.collaboratorId,
+        request.id,
+      );
+      options.closeCollaborationConnections(request.params.documentId);
+      return reply.status(204).send();
+    },
+  );
 
   app.get('/trash', async (request, reply) => {
     const session = requireSession(request);

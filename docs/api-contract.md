@@ -108,20 +108,19 @@ Restore requires the caller's current `baseRevisionId` as well as the historical
 
 Collaboration ticket creation requires the authenticated session, CSRF token, and allowed origin. The response contains a random one-time token, WebSocket URL, document ID, current permission, and expiry. Tickets expire after one minute, are bound to one document and session, and are consumed atomically during WebSocket authentication. The raw ticket is never stored or logged.
 
-## Sharing And Invitations
+## Sharing Registered Accounts
 
-| Method   | Path                                               | Purpose                                    |
-| -------- | -------------------------------------------------- | ------------------------------------------ |
-| `GET`    | `/shared-with-me`                                  | List active document grants                |
-| `GET`    | `/documents/:documentId/collaborators`             | Owner lists grants and pending invitations |
-| `POST`   | `/documents/:documentId/invitations`               | Owner invites email as editor/viewer       |
-| `DELETE` | `/documents/:documentId/invitations/:invitationId` | Owner revokes pending invitation           |
-| `POST`   | `/invitations/accept`                              | Authenticated target accepts raw token     |
-| `POST`   | `/invitations/decline`                             | Authenticated target declines raw token    |
-| `PATCH`  | `/documents/:documentId/collaborators/:userId`     | Owner changes role                         |
-| `DELETE` | `/documents/:documentId/collaborators/:userId`     | Owner revokes access                       |
+| Method   | Path                                           | Purpose                          |
+| -------- | ---------------------------------------------- | -------------------------------- |
+| `GET`    | `/shared-with-me`                              | List active document grants      |
+| `GET`    | `/documents/:documentId/collaborators`         | Owner lists active grants        |
+| `POST`   | `/documents/:documentId/collaborators`         | Owner grants an existing account |
+| `PATCH`  | `/documents/:documentId/collaborators/:userId` | Owner changes role               |
+| `DELETE` | `/documents/:documentId/collaborators/:userId` | Owner revokes access             |
 
-Invitation body: `{ "email": "collaborator@example.com", "role": "editor" }`. Accept body: `{ "token": "raw-token-from-link" }`. The API never returns token hashes. Invitation lookup and acceptance use constant-time comparisons where applicable and generic invalid/expired responses.
+Grant body: `{ "email": "collaborator@example.com", "role": "editor" }`. The target must already have an active MyMD account. Sharing does not return owner folder metadata. Grant, role-change, and revoke routes are owner-only, audited, and invalidate active collaboration-room connections so reconnects must pass current authorization.
+
+Tokenized pending-email invitations, acceptance/decline routes, and email delivery are planned extensions and are not part of the current API.
 
 ## Trash And Health
 

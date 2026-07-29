@@ -48,6 +48,8 @@ MyMD gives individuals and small teams a dependable place to organize, edit, sha
 
 ### Sharing
 
+The current release supports direct sharing to an existing registered account. Tokenized pending-email invitations and email delivery remain planned follow-up work.
+
 - **REQ-SHARE-001:** An owner can invite an email address to one document as editor or viewer.
 - **REQ-SHARE-002:** An invitation has a random single-use token, expiry, inviter, target email, and intended role.
 - **REQ-SHARE-003:** A matching registered user can accept or decline. An unregistered recipient can register first and then accept using the same normalized email.

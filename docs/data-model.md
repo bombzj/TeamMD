@@ -15,8 +15,6 @@ erDiagram
   User ||--o{ DocumentRevision : authors
   Document ||--o{ DocumentAccess : grants
   User ||--o{ DocumentAccess : receives
-  Document ||--o{ Invitation : invites
-  User ||--o{ Invitation : sends
   Document ||--o{ AuditEvent : records
   Document ||--o| CollaborationState : synchronizes
   Document ||--o{ CollaborationTicket : authorizes
@@ -112,7 +110,7 @@ Constraints prohibit access rows for the owner. Deleting or trashing a document 
 
 One-time, document-scoped WebSocket credentials store only a token hash and bind the document, user, and authenticated session. Tickets expire after one minute and become invalid after first consumption. Session and document access are revalidated during consumption.
 
-### `Invitation`
+### Planned `Invitation`
 
 | Field                                                             | Notes                                            |
 | ----------------------------------------------------------------- | ------------------------------------------------ |
@@ -123,7 +121,7 @@ One-time, document-scoped WebSocket credentials store only a token hash and bind
 | `expiresAt`, `acceptedAt`, `declinedAt`, `revokedAt`, `createdAt` | State timestamps                                 |
 | `acceptedById`                                                    | Must match normalized target email at acceptance |
 
-Only one active invitation per `(documentId, normalizedTargetEmail)` is allowed. State transitions are single-use and transactionally guarded.
+This model is planned but not present in the current Prisma schema. Current sharing grants existing active accounts directly through `DocumentAccess`. When pending-email invitations are implemented, only one active invitation per `(documentId, normalizedTargetEmail)` will be allowed and state transitions will be single-use and transactionally guarded.
 
 ### `AuditEvent`
 

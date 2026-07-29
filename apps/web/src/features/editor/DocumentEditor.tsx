@@ -1,6 +1,7 @@
 import {
   collaborationCheckpointEventSchema,
   type CollaborationCheckpointEvent,
+  type CollaboratorRole,
   type DocumentContentResponse,
 } from '@mymd/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,15 +12,21 @@ import {
   CloudOff,
   Eye,
   Save,
+  Trash2,
   Users,
+  X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import {
   ApiClientError,
   checkpointCollaboration,
   createCollaborationTicket,
+  loadCollaborators,
   loadDocument,
+  revokeCollaborator,
+  shareDocument,
+  updateCollaboratorRole,
 } from '../../lib/api.js';
 import {
   createCollaborativeEditor,
@@ -46,6 +53,10 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const [transport, setTransport] =
     useState<CollaborationTransport>('connecting');
   const [notice, setNotice] = useState<string | null>(null);
+  const [sharingOpen, setSharingOpen] = useState(false);
+  const [permission, setPermission] = useState<
+    DocumentContentResponse['permission'] | null
+  >(null);
   const documentQuery = useQuery({
     queryKey: ['documents', documentId],
     queryFn: () => loadDocument(documentId),
@@ -58,7 +69,8 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   if (initialDocumentRef.current === null && documentQuery.data !== undefined) {
     initialDocumentRef.current = documentQuery.data;
   }
-  const readOnly = documentQuery.data?.permission === 'viewer';
+  const effectivePermission = permission ?? documentQuery.data?.permission;
+  const readOnly = effectivePermission === 'viewer';
 
   const applyCheckpoint = (checkpoint: CollaborationCheckpointEvent) => {
     const currentContent = editorRef.current?.getContent() ?? '';
@@ -134,6 +146,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     setContent(initial.content);
     setDirty(false);
     setRevisionOrdinal(initial.currentRevision.ordinal);
+    setPermission(initial.permission);
     setTransport('connecting');
     setNotice(null);
 
@@ -153,6 +166,17 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
       },
       onError: (message) => {
         if (active) setNotice(message);
+      },
+      onPermissionChange: (nextPermission) => {
+        if (!active) return;
+        setPermission(nextPermission);
+        queryClient.setQueryData<DocumentContentResponse>(
+          ['documents', documentId],
+          (current) =>
+            current === undefined
+              ? current
+              : { ...current, permission: nextPermission },
+        );
       },
       onTransportChange: (nextTransport) => {
         if (!active) return;
@@ -275,6 +299,15 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
               <Save size={17} /> {saveMutation.isPending ? 'Saving...' : 'Save'}
             </button>
           )}
+          {effectivePermission === 'owner' && (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setSharingOpen(true)}
+            >
+              <Users size={17} /> Share
+            </button>
+          )}
         </div>
       </header>
       {notice !== null && notice !== 'Saved' && (
@@ -306,7 +339,180 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
           {readOnly ? 'View only' : dirty ? 'Shared draft' : 'Saved to history'}
         </span>
       </footer>
+      {sharingOpen && (
+        <SharingDialog
+          documentId={documentId}
+          documentName={documentQuery.data.name}
+          onClose={() => setSharingOpen(false)}
+        />
+      )}
     </main>
+  );
+}
+
+function SharingDialog({
+  documentId,
+  documentName,
+  onClose,
+}: {
+  documentId: string;
+  documentName: string;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<CollaboratorRole>('editor');
+  const [notice, setNotice] = useState<string | null>(null);
+  const collaboratorsQuery = useQuery({
+    queryKey: ['documents', documentId, 'collaborators'],
+    queryFn: () => loadCollaborators(documentId),
+  });
+  const refresh = async () => {
+    setNotice(null);
+    await queryClient.invalidateQueries({
+      queryKey: ['documents', documentId, 'collaborators'],
+    });
+  };
+  const grantMutation = useMutation({
+    mutationFn: () => shareDocument(documentId, { email, role }),
+    onSuccess: async () => {
+      setEmail('');
+      await refresh();
+    },
+    onError: (error) => setNotice(messageFor(error)),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({
+      collaboratorId,
+      nextRole,
+    }: {
+      collaboratorId: string;
+      nextRole: CollaboratorRole;
+    }) => updateCollaboratorRole(documentId, collaboratorId, nextRole),
+    onSuccess: refresh,
+    onError: (error) => setNotice(messageFor(error)),
+  });
+  const revokeMutation = useMutation({
+    mutationFn: (collaboratorId: string) =>
+      revokeCollaborator(documentId, collaboratorId),
+    onSuccess: refresh,
+    onError: (error) => setNotice(messageFor(error)),
+  });
+  const pending =
+    grantMutation.isPending ||
+    updateMutation.isPending ||
+    revokeMutation.isPending;
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setNotice(null);
+    grantMutation.mutate();
+  };
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        className="item-dialog sharing-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sharing-dialog-title"
+      >
+        <button
+          className="dialog-close"
+          type="button"
+          aria-label="Close sharing"
+          onClick={onClose}
+        >
+          <X size={18} />
+        </button>
+        <p className="eyebrow">Access</p>
+        <h2 id="sharing-dialog-title">Share {documentName}</h2>
+        <form className="sharing-form" onSubmit={submit}>
+          <label className="field-label sharing-email">
+            Registered email
+            <input
+              autoFocus
+              type="email"
+              value={email}
+              maxLength={320}
+              required
+              placeholder="collaborator@example.com"
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label className="field-label sharing-role">
+            Role
+            <select
+              value={role}
+              onChange={(event) =>
+                setRole(event.target.value as CollaboratorRole)
+              }
+            >
+              <option value="editor">Can edit</option>
+              <option value="viewer">View only</option>
+            </select>
+          </label>
+          <button
+            className="primary-action compact-action sharing-submit"
+            type="submit"
+            aria-label="Share document"
+            disabled={pending}
+          >
+            <Users size={16} /> Share
+          </button>
+        </form>
+        <p className="sharing-hint">
+          The person must already have a MyMD account with this email.
+        </p>
+        {notice && (
+          <p className="form-error" role="alert">
+            {notice}
+          </p>
+        )}
+        <div className="collaborator-list" aria-label="People with access">
+          {collaboratorsQuery.isPending ? (
+            <p className="sharing-status">Loading people with access...</p>
+          ) : collaboratorsQuery.isError ? (
+            <p className="form-error">{messageFor(collaboratorsQuery.error)}</p>
+          ) : collaboratorsQuery.data.collaborators.length === 0 ? (
+            <p className="sharing-status">Only you have access.</p>
+          ) : (
+            collaboratorsQuery.data.collaborators.map((collaborator) => (
+              <div className="collaborator-row" key={collaborator.userId}>
+                <div className="collaborator-copy">
+                  <strong>{collaborator.email}</strong>
+                  <span>Added {formatSharingDate(collaborator.createdAt)}</span>
+                </div>
+                <select
+                  aria-label={`Role for ${collaborator.email}`}
+                  value={collaborator.role}
+                  disabled={pending}
+                  onChange={(event) =>
+                    updateMutation.mutate({
+                      collaboratorId: collaborator.userId,
+                      nextRole: event.target.value as CollaboratorRole,
+                    })
+                  }
+                >
+                  <option value="editor">Can edit</option>
+                  <option value="viewer">View only</option>
+                </select>
+                <button
+                  className="icon-button danger-icon"
+                  type="button"
+                  disabled={pending}
+                  aria-label={`Remove ${collaborator.email}`}
+                  title="Remove access"
+                  onClick={() => revokeMutation.mutate(collaborator.userId)}
+                >
+                  <Trash2 size={17} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -362,4 +568,10 @@ function messageFor(error: unknown): string {
   if (error instanceof ApiClientError) return error.message;
   if (error instanceof Error) return error.message;
   return 'The document could not be loaded.';
+}
+
+function formatSharingDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
+    new Date(value),
+  );
 }

@@ -2,7 +2,7 @@
 
 ## Goals
 
-Tests protect the highest-risk properties: no unauthorized data access, convergent collaboration, no silent data loss, immutable recoverable checkpoints, safe invitation use, and stable editor behavior. Test fidelity matters more than raw count.
+Tests protect the highest-risk properties: no unauthorized data access, convergent collaboration, no silent data loss, immutable recoverable checkpoints, safe sharing, and stable editor behavior. Test fidelity matters more than raw count.
 
 ## Layers
 
@@ -24,7 +24,7 @@ Use Fastify injection with the real application composition and a disposable rea
 - atomic save creation and head advancement;
 - two concurrent saves from one base, with exactly one success and one `409`;
 - restore creating a new revision without changing old revisions;
-- invitation expiry, email match, single use, duplicate/revoked invitations, and role changes;
+- existing-account email match, owner-only grants, role changes, room invalidation, and revocation;
 - folder cycles, active-name uniqueness under MySQL null/collation behavior, subtree trash/restore, and limits;
 - response schema validation and secret/content log redaction.
 - one-time collaboration ticket expiry/reuse, viewer read-only enforcement, two-provider convergence, checkpoint exactness, and restart recovery.
@@ -49,7 +49,7 @@ Use Playwright against built web/API applications and isolated MySQL data. Criti
 
 1. Register, create folders/document, edit, save, reload, and observe content.
 2. Save multiple revisions, inspect history, restore one, and verify a new head.
-3. Owner invites editor; editor accepts and saves; owner sees attribution.
+3. Owner grants an existing account editor access; editor opens the shared document and saves; owner sees the checkpoint.
 4. Two browser contexts edit concurrently, converge, and observe the same explicit checkpoint without text loss.
 5. Owner revokes editor; editor's already-open page can no longer save or refetch content.
 6. Viewer can read but cannot mutate through UI or direct request.

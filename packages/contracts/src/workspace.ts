@@ -141,6 +141,41 @@ export const collaborationCheckpointEventSchema = revisionSummarySchema
   })
   .strict();
 
+export const collaboratorRoleSchema = z.enum(['editor', 'viewer']);
+
+export const shareDocumentRequestSchema = z
+  .object({
+    email: z.email().max(320),
+    role: collaboratorRoleSchema,
+  })
+  .strict();
+
+export const updateCollaboratorRequestSchema = z
+  .object({ role: collaboratorRoleSchema })
+  .strict();
+
+export const collaboratorSchema = z
+  .object({
+    userId: resourceIdSchema,
+    email: z.email().max(320),
+    role: collaboratorRoleSchema,
+    createdAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const collaboratorListResponseSchema = z
+  .object({ collaborators: z.array(collaboratorSchema).max(100) })
+  .strict();
+
+export const sharedDocumentSummarySchema = documentSummarySchema
+  .extend({ permission: collaboratorRoleSchema })
+  .strict();
+
+export const sharedDocumentListResponseSchema = z
+  .object({ documents: z.array(sharedDocumentSummarySchema).max(1_000) })
+  .strict();
+
 export const workspaceTreeResponseSchema = z
   .object({
     folders: z.array(folderSchema),
@@ -187,6 +222,19 @@ export type CollaborationCheckpointEvent = z.infer<
 >;
 export type CollaborationCheckpointResponse = z.infer<
   typeof collaborationCheckpointResponseSchema
+>;
+export type CollaboratorRole = z.infer<typeof collaboratorRoleSchema>;
+export type ShareDocumentRequest = z.infer<typeof shareDocumentRequestSchema>;
+export type UpdateCollaboratorRequest = z.infer<
+  typeof updateCollaboratorRequestSchema
+>;
+export type CollaboratorDto = z.infer<typeof collaboratorSchema>;
+export type CollaboratorListResponse = z.infer<
+  typeof collaboratorListResponseSchema
+>;
+export type SharedDocumentSummary = z.infer<typeof sharedDocumentSummarySchema>;
+export type SharedDocumentListResponse = z.infer<
+  typeof sharedDocumentListResponseSchema
 >;
 export type WorkspaceTreeResponse = z.infer<typeof workspaceTreeResponseSchema>;
 export type TrashResponse = z.infer<typeof trashResponseSchema>;

@@ -45,7 +45,7 @@ Dependency direction is one way:
 5. Passwords use Argon2id. Sessions use opaque, revocable tokens stored hashed at rest and delivered in secure HttpOnly cookies.
 6. All untrusted request, response, environment, and persisted JSON boundaries use Zod validation where applicable.
 7. Document roles are `owner`, `editor`, and `viewer`. Exactly one owner exists in MVP. Ownership transfer is out of scope.
-8. Invitations are document-scoped, expire, are single-use, and may target a registered account or a normalized pending email address.
+8. Current sharing directly grants document access to an existing registered account by normalized email. Future pending-email invitations must be document-scoped, expiring, and single-use.
 9. Database changes use reviewed Prisma migrations. Never use schema push in shared environments.
 10. Yjs operational state uses the authenticated collaboration protocol and separate persistence. Collaborative Save reads the authoritative room and creates an immutable revision; clients never submit whole-document content for a collaborative checkpoint.
 
@@ -82,7 +82,7 @@ Never weaken or delete a failing test merely to make CI pass. Record unrelated f
 
 - Never log credentials, raw tokens, document content, or full request bodies.
 - Normalize email for identity lookup while preserving a display form if needed.
-- Rate-limit authentication and invitation endpoints.
+- Rate-limit authentication and sharing endpoints.
 - Render Markdown with sanitization; raw HTML is disabled by default.
 - Keep secrets out of source control and update `.env.example` when configuration changes.
 - Enforce size, depth, and count limits at API boundaries.

@@ -78,6 +78,55 @@ describe('WorkspaceView', () => {
       }),
     );
   });
+
+  it('lists shared documents with permission and opens the editor', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url === '/api/v1/shared-with-me') {
+        return Promise.resolve(
+          jsonResponse({
+            documents: [{ ...createdDocument, permission: 'editor' }],
+          }),
+        );
+      }
+      if (url === `/api/v1/documents/${createdDocument.id}`) {
+        return Promise.resolve(
+          jsonResponse({
+            ...createdDocument,
+            permission: 'editor',
+            content: '# Shared\n',
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceView
+          view="shared"
+          createDocumentRequest={0}
+          onViewChange={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Can edit')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Readme.md' }),
+    ).toBeTruthy();
+  });
 });
 
 function jsonResponse(body: unknown, status = 200): Response {

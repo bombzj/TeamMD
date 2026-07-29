@@ -111,12 +111,14 @@ sequenceDiagram
 
 The API may accept the word “overwrite” in UI language, but persistence never updates revision content in place. A transaction creates a snapshot and advances the head. The row lock and base comparison serialize concurrent saves.
 
-### Invite And Accept
+### Grant Registered Account Access
 
-1. The owner submits normalized target email and role.
-2. The API verifies ownership, rate limits the action, invalidates equivalent outstanding invitations, stores only a hash of a high-entropy token, and sends the raw token in a link.
-3. The authenticated recipient submits the token. The API hashes it, locks the invitation, checks expiry/use/email match, upserts document access, marks the invitation used, and records an audit event in one transaction.
-4. Role change or revocation takes effect on the next API request; an open editor cannot bypass the server check.
+1. The owner submits the email of an existing active account and an editor/viewer role.
+2. The API verifies ownership, normalizes the email, upserts document access, and records an audit event in one transaction.
+3. The document appears in the recipient's virtual Shared with me view without owner folder metadata.
+4. Grant, role change, and revocation close all active connections in that document room. Reconnecting clients obtain a fresh one-time ticket and revalidate current access.
+
+Pending-email token invitations and email delivery may be added later over the same `DocumentAccess` grant boundary.
 
 ## Authorization Model
 
@@ -140,8 +142,7 @@ Authorization queries must combine resource lookup and access checks where pract
 Transactions are mandatory for:
 
 - revision insert + document head advance + audit event;
-- invitation acceptance + access upsert + invitation consumption + audit event;
-- role change/revocation + invitation cleanup + audit event;
+- direct access grant/update/revocation + audit event;
 - subtree trash, restore, move, and permanent deletion;
 - session creation/rotation and logout-all epoch updates where applicable.
 
@@ -150,7 +151,7 @@ Use MySQL `InnoDB`, foreign keys, and `utf8mb4`. Set transaction isolation expli
 ## Scale And Performance
 
 - Cursor pagination for documents, shared items, revisions, sessions, and audit data.
-- Index normalized email, owner/parent/name keys, document access by user, invitation token hash, session token hash, and revision `(documentId, ordinal)`.
+- Index normalized email, owner/parent/name keys, document access by user, session token hash, and revision `(documentId, ordinal)`.
 - Keep revision bodies out of tree and history-list queries.
 - Enforce request body and Markdown byte limits before expensive work.
 - Add object storage only when measured revision size/cost warrants it; MySQL remains sufficient for initial bounded text snapshots.

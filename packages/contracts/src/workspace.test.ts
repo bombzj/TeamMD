@@ -4,9 +4,12 @@ import {
   createDocumentRequestSchema,
   createFolderRequestSchema,
   documentContentResponseSchema,
+  collaboratorListResponseSchema,
   saveDocumentRequestSchema,
   saveDocumentResponseSchema,
   updateFolderRequestSchema,
+  shareDocumentRequestSchema,
+  sharedDocumentListResponseSchema,
   workspaceTreeResponseSchema,
 } from './index.js';
 
@@ -126,6 +129,66 @@ describe('workspace contracts', () => {
       saveDocumentRequestSchema.parse({
         baseRevisionId: 'cm1234567890revisionabcdef',
         content: 'a'.repeat(2 * 1024 * 1024 + 1),
+      }),
+    ).toThrow();
+  });
+
+  it('validates direct collaborator grants and shared document responses', () => {
+    expect(
+      shareDocumentRequestSchema.parse({
+        email: 'collaborator@example.test',
+        role: 'editor',
+      }),
+    ).toEqual({ email: 'collaborator@example.test', role: 'editor' });
+    expect(
+      collaboratorListResponseSchema.parse({
+        collaborators: [
+          {
+            userId: 'cm1234567890userabcdefgh',
+            email: 'collaborator@example.test',
+            role: 'viewer',
+            createdAt: '2026-07-28T00:00:00.000Z',
+            updatedAt: '2026-07-28T00:00:00.000Z',
+          },
+        ],
+      }).collaborators[0]?.role,
+    ).toBe('viewer');
+    expect(
+      sharedDocumentListResponseSchema.parse({
+        documents: [
+          {
+            id: 'cm1234567890documentabcdef',
+            folderId: null,
+            name: 'Shared.md',
+            permission: 'editor',
+            currentRevision: {
+              id: 'cm1234567890revisionabcdef',
+              ordinal: 1,
+              createdAt: '2026-07-28T00:00:00.000Z',
+            },
+            createdAt: '2026-07-28T00:00:00.000Z',
+            updatedAt: '2026-07-28T00:00:00.000Z',
+          },
+        ],
+      }).documents[0]?.permission,
+    ).toBe('editor');
+  });
+
+  it('rejects invalid direct collaborator grants', () => {
+    expect(() =>
+      shareDocumentRequestSchema.parse({ email: 'not-email', role: 'editor' }),
+    ).toThrow();
+    expect(() =>
+      shareDocumentRequestSchema.parse({
+        email: 'owner@example.test',
+        role: 'owner',
+      }),
+    ).toThrow();
+    expect(() =>
+      shareDocumentRequestSchema.parse({
+        email: 'viewer@example.test',
+        role: 'viewer',
+        documentId: 'not-accepted',
       }),
     ).toThrow();
   });

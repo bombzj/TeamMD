@@ -38,12 +38,13 @@ Each phase ends with usable behavior, focused automated tests, updated documenta
 
 **Exit:** concurrent stale saves never overwrite newer content; revision and restore end-to-end tests pass.
 
-## Phase 4: Invitations And Shared Editing
+## Phase 4: Sharing And Shared Editing
 
-- Implement owner-managed invitations, acceptance/decline, role changes, and revocation.
-- Add email delivery through an adapter and Mailpit locally.
-- Add a Shared with me view without exposing owner folder structure.
-- Re-check authorization on every read and save.
+- Implement owner-managed direct grants to registered accounts, role changes, and revocation. Complete.
+- Add a Shared with me view without exposing owner folder structure. Complete.
+- Re-check authorization on every HTTP read/save and WebSocket ticket. Complete.
+- Disconnect active rooms after access changes so every client reauthorizes. Complete.
+- Add pending-email token invitations and email delivery through an adapter when external invitations are prioritized.
 
 **Exit:** the complete role/action matrix passes at service, route, and end-to-end layers.
 

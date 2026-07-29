@@ -2,16 +2,22 @@ import {
   authResponseSchema,
   collaborationCheckpointResponseSchema,
   collaborationTicketResponseSchema,
+  collaboratorListResponseSchema,
+  collaboratorSchema,
   documentContentResponseSchema,
   documentSummarySchema,
   errorResponseSchema,
   folderSchema,
   saveDocumentResponseSchema,
+  sharedDocumentListResponseSchema,
   trashResponseSchema,
   workspaceTreeResponseSchema,
   type AuthResponse,
   type CollaborationCheckpointResponse,
   type CollaborationTicketResponse,
+  type CollaboratorDto,
+  type CollaboratorListResponse,
+  type CollaboratorRole,
   type CreateDocumentRequest,
   type CreateFolderRequest,
   type DocumentSummaryDto,
@@ -21,6 +27,7 @@ import {
   type RegisterRequest,
   type SaveDocumentRequest,
   type SaveDocumentResponse,
+  type SharedDocumentListResponse,
   type TrashResponse,
   type UpdateDocumentRequest,
   type UpdateFolderRequest,
@@ -86,6 +93,55 @@ export async function logout(): Promise<void> {
 export async function loadWorkspaceTree(): Promise<WorkspaceTreeResponse> {
   return requestJson('/api/v1/workspace/tree', undefined, (value) =>
     workspaceTreeResponseSchema.parse(value),
+  );
+}
+
+export async function loadSharedDocuments(): Promise<SharedDocumentListResponse> {
+  return requestJson('/api/v1/shared-with-me', undefined, (value) =>
+    sharedDocumentListResponseSchema.parse(value),
+  );
+}
+
+export async function loadCollaborators(
+  documentId: string,
+): Promise<CollaboratorListResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/collaborators`,
+    undefined,
+    (value) => collaboratorListResponseSchema.parse(value),
+  );
+}
+
+export async function shareDocument(
+  documentId: string,
+  input: { email: string; role: CollaboratorRole },
+): Promise<CollaboratorDto> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/collaborators`,
+    mutation('POST', input),
+    (value) => collaboratorSchema.parse(value),
+  );
+}
+
+export async function updateCollaboratorRole(
+  documentId: string,
+  collaboratorId: string,
+  role: CollaboratorRole,
+): Promise<CollaboratorDto> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/collaborators/${collaboratorId}`,
+    mutation('PATCH', { role }),
+    (value) => collaboratorSchema.parse(value),
+  );
+}
+
+export async function revokeCollaborator(
+  documentId: string,
+  collaboratorId: string,
+): Promise<void> {
+  return requestEmpty(
+    `/api/v1/documents/${documentId}/collaborators/${collaboratorId}`,
+    mutation('DELETE'),
   );
 }
 

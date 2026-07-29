@@ -9,6 +9,7 @@ const collaboration = vi.hoisted(() => ({
   options: null as null | {
     readOnly: boolean;
     onContentChange: (content: string) => void;
+    onPermissionChange: (permission: 'owner' | 'editor' | 'viewer') => void;
     onTransportChange: (transport: 'synced') => void;
   },
   prepareCheckpoint: vi.fn().mockResolvedValue(undefined),
@@ -18,6 +19,7 @@ type MockEditorOptions = {
   initialContent: string;
   readOnly: boolean;
   onContentChange: (content: string) => void;
+  onPermissionChange: (permission: 'owner' | 'editor' | 'viewer') => void;
   onTransportChange: (transport: 'synced') => void;
 };
 
@@ -142,6 +144,80 @@ describe('DocumentEditor', () => {
     await waitFor(() => expect(collaboration.options?.readOnly).toBe(true));
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(screen.getByText('View only')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
+  });
+
+  it('lets owners grant an existing account editor access', async () => {
+    const collaborator = {
+      userId: 'cm1234567890collaboratorab',
+      email: 'collaborator@example.test',
+      role: 'editor',
+      createdAt: '2026-07-28T00:03:00.000Z',
+      updatedAt: '2026-07-28T00:03:00.000Z',
+    };
+    let collaborators: (typeof collaborator)[] = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url === `/api/v1/documents/${documentId}`) {
+        return Promise.resolve(jsonResponse(documentResponse));
+      }
+      if (url.endsWith('/collaboration-ticket')) {
+        return Promise.resolve(jsonResponse(collaborationTicket()));
+      }
+      if (url.endsWith('/collaborators') && init?.method === 'POST') {
+        collaborators = [collaborator];
+        return Promise.resolve(jsonResponse(collaborator, 201));
+      }
+      if (url.endsWith('/collaborators')) {
+        return Promise.resolve(jsonResponse({ collaborators }));
+      }
+      return Promise.reject(
+        new Error(`Unexpected request: ${url} ${String(init?.method)}`),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(await screen.findByRole('button', { name: 'Share' }));
+    await user.type(
+      screen.getByLabelText('Registered email'),
+      collaborator.email,
+    );
+    await user.click(screen.getByRole('button', { name: 'Share document' }));
+
+    expect(await screen.findByText(collaborator.email)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/documents/${documentId}/collaborators`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ email: collaborator.email, role: 'editor' }),
+      }),
+    );
+  });
+
+  it('becomes read-only when a reconnect ticket downgrades permission', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url === `/api/v1/documents/${documentId}`) {
+          return Promise.resolve(jsonResponse(documentResponse));
+        }
+        if (url.endsWith('/collaboration-ticket')) {
+          return Promise.resolve(jsonResponse(collaborationTicket()));
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      }),
+    );
+    renderEditor();
+
+    expect(await screen.findByRole('button', { name: 'Share' })).toBeTruthy();
+    act(() => collaboration.options?.onPermissionChange('viewer'));
+
+    expect(await screen.findByText('Shared document · View only')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
   });
 });
 

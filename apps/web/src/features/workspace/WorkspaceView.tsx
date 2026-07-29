@@ -15,6 +15,8 @@ import {
   Pencil,
   RotateCcw,
   Trash2,
+  UserRound,
+  Users,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -25,6 +27,7 @@ import {
   createDocument,
   createFolder,
   loadTrash,
+  loadSharedDocuments,
   loadWorkspaceTree,
   permanentlyDeleteDocument,
   permanentlyDeleteFolder,
@@ -37,9 +40,9 @@ import {
 } from '../../lib/api.js';
 
 type WorkspaceViewProps = {
-  view: 'files' | 'trash';
+  view: 'files' | 'shared' | 'trash';
   createDocumentRequest: number;
-  onViewChange: (view: 'files' | 'trash') => void;
+  onViewChange: (view: 'files' | 'shared' | 'trash') => void;
 };
 
 type SelectedItem =
@@ -55,6 +58,7 @@ type DialogState =
 
 const treeQueryKey = ['workspace', 'tree'] as const;
 const trashQueryKey = ['workspace', 'trash'] as const;
+const sharedQueryKey = ['workspace', 'shared'] as const;
 
 export function WorkspaceView({
   view,
@@ -77,6 +81,11 @@ export function WorkspaceView({
     queryKey: trashQueryKey,
     queryFn: loadTrash,
     enabled: view === 'trash',
+  });
+  const sharedQuery = useQuery({
+    queryKey: sharedQueryKey,
+    queryFn: loadSharedDocuments,
+    enabled: view === 'shared',
   });
   const operation = useMutation({
     mutationFn: async (action: () => Promise<unknown>) => action(),
@@ -198,6 +207,73 @@ export function WorkspaceView({
               )
             }
           />
+        )}
+      </main>
+    );
+  }
+
+  if (view === 'shared') {
+    if (openDocumentId !== null) {
+      return (
+        <DocumentEditor
+          documentId={openDocumentId}
+          onClose={() => setOpenDocumentId(null)}
+        />
+      );
+    }
+    return (
+      <main className="workspace-main">
+        <WorkspaceHeader
+          eyebrow="Collaboration"
+          title="Shared with me"
+          description="Documents other people have shared with your account."
+        />
+        {sharedQuery.isPending ? (
+          <WorkspaceStatus label="Loading shared documents" />
+        ) : sharedQuery.isError ? (
+          <WorkspaceError
+            error={sharedQuery.error}
+            onRetry={sharedQuery.refetch}
+          />
+        ) : sharedQuery.data.documents.length === 0 ? (
+          <EmptyState
+            icon={<Users size={30} strokeWidth={1.5} />}
+            title="Nothing has been shared yet"
+            copy="Documents shared with your registered email address will appear here."
+            actionLabel="Return to files"
+            onAction={() => onViewChange('files')}
+          />
+        ) : (
+          <section className="trash-list" aria-label="Shared documents">
+            {sharedQuery.data.documents.map((document) => (
+              <article
+                className="trash-row shared-document-row"
+                key={document.id}
+              >
+                <div className="trash-item-icon" aria-hidden="true">
+                  <FileText size={20} />
+                </div>
+                <div className="trash-copy">
+                  <strong>{document.name}</strong>
+                  <span>
+                    Revision {document.currentRevision.ordinal} · Updated{' '}
+                    {formatDate(document.updatedAt)}
+                  </span>
+                </div>
+                <span className="permission-label">
+                  <UserRound size={14} />
+                  {document.permission === 'editor' ? 'Can edit' : 'View only'}
+                </span>
+                <button
+                  className="primary-action compact-action"
+                  type="button"
+                  onClick={() => setOpenDocumentId(document.id)}
+                >
+                  <FileText size={16} /> Open
+                </button>
+              </article>
+            ))}
+          </section>
         )}
       </main>
     );
