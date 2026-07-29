@@ -44,15 +44,15 @@ importers:
       '@hocuspocus/server':
         specifier: 4.4.0
         version: 4.4.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
-      '@mymd/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@mymd/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
       '@prisma/client':
         specifier: ^6.12.0
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      '@teammd/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@teammd/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       argon2:
         specifier: ^0.43.1
         version: 0.43.1
@@ -117,12 +117,12 @@ importers:
       '@hocuspocus/provider':
         specifier: 4.4.0
         version: 4.4.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
-      '@mymd/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
       '@tanstack/react-query':
         specifier: ^5.83.0
         version: 5.101.4(react@19.2.8)
+      '@teammd/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       lucide-react:
         specifier: ^0.536.0
         version: 0.536.0(react@19.2.8)

@@ -2,7 +2,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import type { ServerConfig } from '@mymd/config';
+import type { ServerConfig } from '@teammd/config';
 import type { PrismaClient } from '@prisma/client';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';

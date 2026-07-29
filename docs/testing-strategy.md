@@ -25,6 +25,7 @@ Use Fastify injection with the real application composition and a disposable rea
 - two concurrent saves from one base, with exactly one success and one `409`;
 - restore creating a new revision without changing old revisions;
 - existing-account email match, owner-only grants, role changes, room invalidation, and revocation;
+- owner-only public-link create/rotate/revoke, hash-only storage, current-revision resolution, hidden-ancestor rejection, and generic invalid-token behavior;
 - folder cycles, active-name uniqueness under MySQL null/collation behavior, subtree trash/restore, and limits;
 - response schema validation and secret/content log redaction.
 - one-time collaboration ticket expiry/reuse, viewer read-only enforcement, two-provider convergence, checkpoint exactness, and restart recovery.
@@ -36,9 +37,12 @@ Do not substitute SQLite for MySQL transaction, collation, unique-index, or lock
 Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not React internals. Cover:
 
 - the CodeMirror/Yjs adapter initializes once, obtains fresh reconnect tickets, and destroys provider/listeners/instances;
+- awareness changes update the anonymous participant count while cursor/selection identity remains generic and ephemeral;
 - Vditor receives only sanitized preview input and is never a second writable surface;
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
 - background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;
+- restore control events force an authorized refetch and a fresh Yjs document while ending at a clean saved revision;
+- public fragment routing skips session bootstrap, strips the bearer from the address bar, performs one resolver request under React Strict Mode, and renders no writable controls;
 - navigation and tab-close warnings when dirty;
 - permission-based presentation while assuming the API remains authoritative;
 - keyboard tree navigation, focus restoration, labels, dialog traps, and announcements.
@@ -51,15 +55,18 @@ Use Playwright against built web/API applications and isolated MySQL data. Criti
 2. Save multiple revisions, inspect history, restore one, and verify a new head.
 3. Owner grants an existing account editor access; editor opens the shared document and saves; owner sees the checkpoint.
 4. Two browser contexts edit concurrently, converge, and observe the same explicit checkpoint without text loss.
-5. Owner revokes editor; editor's already-open page can no longer save or refetch content.
-6. Viewer can read but cannot mutate through UI or direct request.
-7. Trash and restore a folder subtree; permanently delete with confirmation.
+5. Both contexts show the current participant count and remote selections without exposing account email addresses.
+6. Owner revokes editor; editor's already-open page can no longer save or refetch content.
+7. Viewer can read but cannot mutate through UI or direct request.
+8. Trash and restore a folder subtree; permanently delete with confirmation.
+9. Create a public link, open it in an isolated anonymous context, verify only the current saved revision, rotate/revoke it, and verify the old token becomes generically unavailable.
 
 Run Chromium on every pull request and add Firefox/WebKit in scheduled or release workflows. Include desktop and narrow mobile viewport checks even though native mobile is out of scope.
 
 ### Security And Operational Tests
 
 - Stored-XSS fixture corpus through Markdown preview and history views
+- Public-link token leakage checks across URLs, logs, referrers, caches, error responses, and browser persistence
 - CSRF with missing/invalid token and disallowed origin
 - Cookie attributes and cache-control for authenticated/private responses
 - Credential stuffing and invitation/save rate limits

@@ -2,14 +2,14 @@
 
 ## Product Goal
 
-MyMD gives individuals and small teams a dependable place to organize, edit, share, and recover Markdown documents. It should feel familiar to users of collaborative office tools while preserving Markdown as the canonical content format.
+TeamMD gives individuals and small teams a dependable place to organize, edit, share, and recover Markdown documents. It should feel familiar to users of collaborative office tools while preserving Markdown as the canonical content format.
 
 ## Product Principles
 
 - No silent data loss.
 - Sharing is explicit, scoped, and revocable.
 - Markdown remains portable plain text.
-- The MVP favors understandable explicit saves over premature real-time complexity.
+- Real-time drafts and explicit durable saves have distinct, understandable states.
 - History is immutable and attributable.
 - Keyboard and screen-reader workflows are first-class.
 
@@ -38,23 +38,26 @@ MyMD gives individuals and small teams a dependable place to organize, edit, sha
 
 ### Editing And Saves
 
-- **REQ-EDIT-001:** An authorized editor can edit Markdown in Vditor and see dirty, saving, saved, failed, read-only, and conflict states.
+- **REQ-EDIT-001:** An authorized editor can edit Markdown in the CodeMirror/Yjs surface, see a sanitized Vditor preview, and see dirty, saving, saved, failed, read-only, and connection states.
 - **REQ-EDIT-002:** Save is explicit through a button and `Ctrl+S` or `Cmd+S`; leaving with unsaved changes triggers a navigation warning.
 - **REQ-EDIT-003:** Each successful save atomically creates one immutable revision and makes it the document head.
-- **REQ-EDIT-004:** A save must identify the revision from which editing began. A stale base receives a conflict response containing safe head metadata, never an automatic overwrite.
+- **REQ-EDIT-004:** A legacy whole-document save must identify the revision from which editing began and receives a conflict response for a stale base. A collaborative Save checkpoints the server-authoritative Yjs room after pending updates are synchronized; neither path silently overwrites newer content.
 - **REQ-EDIT-005:** Content is bounded by a configurable UTF-8 byte limit. The initial proposal is 2 MiB per revision.
 - **REQ-EDIT-006:** Authorized editors connected to the same collaborative document converge on the same Markdown text without whole-document last-write-wins replacement.
 - **REQ-EDIT-007:** Collaborative operational updates are distinct from immutable revisions. Explicit Save captures a durable server-authoritative checkpoint; presence and cursors are ephemeral.
 
 ### Sharing
 
-The current release supports direct sharing to an existing registered account. Tokenized pending-email invitations and email delivery remain planned follow-up work.
+The current release supports direct sharing to an existing registered account and revocable read-only public links. Tokenized pending-email invitations and email delivery remain planned follow-up work.
 
-- **REQ-SHARE-001:** An owner can invite an email address to one document as editor or viewer.
-- **REQ-SHARE-002:** An invitation has a random single-use token, expiry, inviter, target email, and intended role.
-- **REQ-SHARE-003:** A matching registered user can accept or decline. An unregistered recipient can register first and then accept using the same normalized email.
+- **REQ-SHARE-001:** An owner can grant one existing registered account editor or viewer access to one document by normalized email.
+- **REQ-SHARE-002:** Direct grants are document-scoped, attributable to the granting owner, and never expose the owner's private folder hierarchy.
+- **REQ-SHARE-003:** The recipient sees the grant in a virtual Shared with me view; no invitation acceptance step is required for a direct grant.
 - **REQ-SHARE-004:** An owner can change a collaborator role or revoke access immediately.
-- **REQ-SHARE-005:** Sharing a document does not grant access to its parent folder, siblings, descendants, or historical invitation data.
+- **REQ-SHARE-005:** Sharing a document does not grant access to its parent folder, siblings, descendants, or historical grant data.
+- **REQ-SHARE-006:** An owner can create or rotate one bearer public link for a document and revoke it immediately.
+- **REQ-SHARE-007:** A public link shows only the document name, current saved Markdown, and current revision summary. It never exposes unsaved collaborative drafts, history, owner identity, collaborators, or folder metadata.
+- **REQ-SHARE-008:** Public links are read-only. The raw token is shown only when created or rotated, is stored hashed at rest, and is carried in the URL fragment rather than the path or query string.
 
 ### History
 
@@ -65,12 +68,13 @@ The current release supports direct sharing to an existing registered account. T
 
 ## Critical Acceptance Scenarios
 
-1. Two editors open revision 7. Alice saves revision 8. Bob's save against revision 7 returns `409 REVISION_CONFLICT`; revision 8 remains unchanged and Bob can copy, compare, reload, or retry after intentionally reconciling.
-2. An owner invites an unregistered email. A user registering with that normalized email can accept before expiry; another account cannot use the token.
+1. Two collaborative editors make concurrent changes, converge on the same Yjs text, and explicitly checkpoint one server-authoritative revision without losing either change. A legacy whole-document save against a stale base still returns `409 REVISION_CONFLICT`.
+2. An owner grants an existing registered account editor access; another account cannot observe the grant or the owner's folder hierarchy.
 3. Revoking a collaborator invalidates subsequent document reads and saves immediately, including from an already-open browser tab.
 4. Restoring revision 3 when revision 9 is current creates revision 10 with revision 3 content; revisions 3 and 9 remain immutable.
 5. A viewer cannot mutate content even by calling the API directly.
 6. Trashing a folder removes its descendants from normal listings without deleting revision history. Restore returns the subtree when its parent is valid.
+7. An owner creates a public link, an anonymous browser reads only the current saved revision, and the same token returns a generic unavailable response after revocation.
 
 ## Non-Functional Requirements
 
@@ -85,7 +89,6 @@ The current release supports direct sharing to an existing registered account. T
 
 - Offline-first synchronization
 - Comments, suggestions, mentions, and notifications beyond invitation email
-- Public or anonymous links
 - Folder-level sharing or inherited access control
 - Rich-text round-trip guarantees beyond Vditor's Markdown behavior
 - Binary attachments, image hosting, publishing, plugins, or arbitrary HTML execution
@@ -95,7 +98,7 @@ The current release supports direct sharing to an existing registered account. T
 
 - No confirmed silent-overwrite incidents.
 - At least 99.9% successful save requests excluding validation and conflict responses.
-- Median time from invitation email to accepted access can be measured.
+- Median time from direct grant to first successful recipient access can be measured.
 - Restore flow succeeds in end-to-end tests and quarterly recovery exercises.
 - Authorization matrix has complete automated coverage for document actions.
 
@@ -106,3 +109,7 @@ The current release supports direct sharing to an existing registered account. T
 - Storage quotas by user and revision count.
 - Whether collaborator access survives an owner's trash action or remains suspended until restore.
 - Exact Markdown flavor and which Vditor modes are exposed initially.
+
+## Deferred Offline-First Decision
+
+Ordinary online reconnect is required and implemented through durable server-side Yjs state. Durable offline-first editing is not part of the current release because browser persistence alone is insufficient: the design must define bounded IndexedDB storage, offline queue limits, collaboration-generation changes after restore, revocation while offline, and deterministic reconciliation without silent data loss. Treat offline-first as a separate milestone with its own threat model and multi-device recovery tests.

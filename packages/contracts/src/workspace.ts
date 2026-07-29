@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 const resourceIdSchema = z.string().min(20).max(30);
+const publicLinkTokenSchema = z
+  .string()
+  .length(43)
+  .regex(/^[A-Za-z0-9_-]+$/);
 const optionalParentIdSchema = resourceIdSchema.nullable();
 const maximumMarkdownBytes = 2 * 1024 * 1024;
 const workspaceNameSchema = z
@@ -93,6 +97,32 @@ export const revisionSummarySchema = z
   })
   .strict();
 
+export const revisionHistoryItemSchema = revisionSummarySchema
+  .extend({
+    author: z
+      .object({ id: resourceIdSchema, email: z.email().max(320) })
+      .strict(),
+    byteSize: z.number().int().nonnegative(),
+    saveMessage: z.string().max(500).nullable(),
+    restoredFromRevisionId: resourceIdSchema.nullable(),
+  })
+  .strict();
+
+export const revisionListResponseSchema = z
+  .object({ revisions: z.array(revisionHistoryItemSchema).max(200) })
+  .strict();
+
+export const revisionContentResponseSchema = revisionHistoryItemSchema
+  .extend({ content: z.string() })
+  .strict();
+
+export const restoreRevisionRequestSchema = z
+  .object({
+    baseRevisionId: resourceIdSchema,
+    saveMessage: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
 export const documentSummarySchema = z
   .object({
     id: resourceIdSchema,
@@ -141,6 +171,13 @@ export const collaborationCheckpointEventSchema = revisionSummarySchema
   })
   .strict();
 
+export const collaborationRestoreEventSchema = revisionSummarySchema
+  .extend({
+    type: z.literal('document-restored'),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
 export const collaboratorRoleSchema = z.enum(['editor', 'viewer']);
 
 export const shareDocumentRequestSchema = z
@@ -174,6 +211,26 @@ export const sharedDocumentSummarySchema = documentSummarySchema
 
 export const sharedDocumentListResponseSchema = z
   .object({ documents: z.array(sharedDocumentSummarySchema).max(1_000) })
+  .strict();
+
+export const publicLinkStatusSchema = z
+  .object({ enabled: z.boolean(), createdAt: z.iso.datetime().nullable() })
+  .strict();
+
+export const publicLinkCreateResponseSchema = z
+  .object({ token: publicLinkTokenSchema, createdAt: z.iso.datetime() })
+  .strict();
+
+export const publicDocumentRequestSchema = z
+  .object({ token: publicLinkTokenSchema })
+  .strict();
+
+export const publicDocumentResponseSchema = z
+  .object({
+    name: workspaceNameSchema,
+    content: z.string(),
+    currentRevision: revisionSummarySchema,
+  })
   .strict();
 
 export const workspaceTreeResponseSchema = z
@@ -214,11 +271,22 @@ export type DocumentContentResponse = z.infer<
   typeof documentContentResponseSchema
 >;
 export type SaveDocumentResponse = z.infer<typeof saveDocumentResponseSchema>;
+export type RevisionHistoryItem = z.infer<typeof revisionHistoryItemSchema>;
+export type RevisionListResponse = z.infer<typeof revisionListResponseSchema>;
+export type RevisionContentResponse = z.infer<
+  typeof revisionContentResponseSchema
+>;
+export type RestoreRevisionRequest = z.infer<
+  typeof restoreRevisionRequestSchema
+>;
 export type CollaborationTicketResponse = z.infer<
   typeof collaborationTicketResponseSchema
 >;
 export type CollaborationCheckpointEvent = z.infer<
   typeof collaborationCheckpointEventSchema
+>;
+export type CollaborationRestoreEvent = z.infer<
+  typeof collaborationRestoreEventSchema
 >;
 export type CollaborationCheckpointResponse = z.infer<
   typeof collaborationCheckpointResponseSchema
@@ -235,6 +303,14 @@ export type CollaboratorListResponse = z.infer<
 export type SharedDocumentSummary = z.infer<typeof sharedDocumentSummarySchema>;
 export type SharedDocumentListResponse = z.infer<
   typeof sharedDocumentListResponseSchema
+>;
+export type PublicLinkStatus = z.infer<typeof publicLinkStatusSchema>;
+export type PublicLinkCreateResponse = z.infer<
+  typeof publicLinkCreateResponseSchema
+>;
+export type PublicDocumentRequest = z.infer<typeof publicDocumentRequestSchema>;
+export type PublicDocumentResponse = z.infer<
+  typeof publicDocumentResponseSchema
 >;
 export type WorkspaceTreeResponse = z.infer<typeof workspaceTreeResponseSchema>;
 export type TrashResponse = z.infer<typeof trashResponseSchema>;

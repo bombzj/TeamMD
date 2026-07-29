@@ -29,12 +29,12 @@ Each phase ends with usable behavior, focused automated tests, updated documenta
 
 **Exit:** users cannot observe or mutate another user's private tree; subtree operations are transactional.
 
-## Phase 3: Vditor And Revision Saves
+## Phase 3: Collaborative Editor And Revision Recovery
 
-- Wrap Vditor in an isolated React adapter with cleanup and controlled document switching.
-- Add dirty-state navigation protection, keyboard save, save status, and read-only mode.
-- Implement atomic immutable revision saves using `baseRevisionId` conflict detection.
-- Add history listing, revision preview, and restore-as-new-revision.
+- Bind CodeMirror to Yjs as the only writable surface and keep Vditor as sanitized preview. Complete.
+- Add dirty-state navigation protection, keyboard save, optional checkpoint messages, save status, and read-only mode. Complete.
+- Implement atomic immutable revision saves using `baseRevisionId` conflict detection. Complete.
+- Add attributable history listing, sanitized revision preview, restore-as-new-revision, and generation-safe live-room reset. Complete.
 
 **Exit:** concurrent stale saves never overwrite newer content; revision and restore end-to-end tests pass.
 
@@ -45,6 +45,7 @@ Each phase ends with usable behavior, focused automated tests, updated documenta
 - Re-check authorization on every HTTP read/save and WebSocket ticket. Complete.
 - Disconnect active rooms after access changes so every client reauthorizes. Complete.
 - Add pending-email token invitations and email delivery through an adapter when external invitations are prioritized.
+- Add owner-managed, revocable read-only public links to the current saved revision. Complete.
 
 **Exit:** the complete role/action matrix passes at service, route, and end-to-end layers.
 
@@ -58,12 +59,18 @@ Each phase ends with usable behavior, focused automated tests, updated documenta
 
 ## Phase 6: Real-Time Collaboration
 
-- Record the validated requirement and define online/offline/checkpoint semantics.
-- Complete document access roles and invitation workflows using one HTTP/WebSocket authorization policy.
-- Introduce Yjs documents and WebSocket collaboration as a separate service boundary or API module.
-- Authenticate socket upgrades and authorize each room server-side.
-- Persist CRDT updates and periodically materialize immutable Markdown checkpoints compatible with revision history.
-- Bind collaborative source editing through CodeMirror 6 and render sanitized preview through Vditor.
-- Add awareness/presence as ephemeral data; never persist cursor positions as document history.
+- Record the validated requirement and define online/checkpoint semantics. Complete.
+- Reuse one document authorization policy for HTTP and WebSocket access. Complete for registered-account grants; pending-email invitations remain Phase 4 follow-up work.
+- Introduce Yjs documents and a Hocuspocus WebSocket collaboration boundary. Complete.
+- Authenticate socket upgrades with short-lived, one-time room tickets and authorize each room server-side. Complete.
+- Persist compacted CRDT state and materialize immutable Markdown checkpoints on explicit Save. Complete.
+- Bind collaborative source editing through CodeMirror 6 and render sanitized preview through Vditor. Complete.
+- Keep awareness, participant counts, and remote cursor/selection data ephemeral. Complete with generic collaborator identities rather than exposed account details.
 
 Real-time work must not weaken explicit snapshots, auditability, revocation, or Markdown export.
+
+**Exit:** two authorized accounts converge on the same document, explicit Save creates one immutable server-authoritative revision, viewers cannot edit, and access changes force room reauthorization. Complete.
+
+## Deferred: Durable Offline-First Editing
+
+Online reconnect and durable server-side Yjs state are complete. True offline-first editing remains a separate milestone requiring IndexedDB-backed Yjs persistence, bounded offline queues/storage, collaboration-generation handling after restore, revocation semantics while disconnected, and deterministic multi-device reconciliation tests. It must not ship as a partial cache feature that weakens explicit-save or no-data-loss guarantees.

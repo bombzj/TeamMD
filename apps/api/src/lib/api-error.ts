@@ -1,4 +1,4 @@
-import type { ErrorCode, ErrorResponse } from '@mymd/contracts';
+import type { ErrorCode, ErrorResponse } from '@teammd/contracts';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 export class ApiError extends Error {

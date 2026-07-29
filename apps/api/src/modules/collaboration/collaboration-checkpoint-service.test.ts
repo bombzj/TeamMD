@@ -86,4 +86,75 @@ describe('CollaborationCheckpointService', () => {
     await roomConnection.disconnect();
     initialDocument.destroy();
   });
+
+  it('restores historical content into the authoritative room and reconnects clients', async () => {
+    const historicalContent = '# Restored history\n';
+    const initialDocument = new Y.Doc();
+    initialDocument.getText('content').insert(0, roomContent);
+    const storeState = vi.fn().mockResolvedValue(undefined);
+    const restoredRevision = {
+      id: 'cm1234567890revisionrestore',
+      ordinal: 4,
+      createdAt: '2026-07-28T00:10:00.000Z',
+    };
+    const collaboration = new Hocuspocus<CollaborationContext>({
+      onLoadDocument() {
+        return Promise.resolve(Y.encodeStateAsUpdate(initialDocument));
+      },
+    });
+    const roomConnection = await collaboration.openDirectConnection(documentId);
+    const room = roomConnection.document;
+    if (room === null) throw new Error('Test room did not load.');
+    const broadcastStateless = vi.spyOn(room, 'broadcastStateless');
+    const closeConnections = vi.spyOn(collaboration, 'closeConnections');
+    const restoreRevision = vi.fn().mockResolvedValue({
+      documentId,
+      currentRevision: restoredRevision,
+    });
+    const service = new CollaborationCheckpointService(
+      collaboration,
+      { storeState } as unknown as CollaborationService,
+      {
+        getRevision: vi.fn().mockResolvedValue({ content: historicalContent }),
+        restoreRevision,
+      } as unknown as WorkspaceService,
+    );
+
+    const result = await service.restoreRevision(
+      userId,
+      documentId,
+      baseRevisionId,
+      { baseRevisionId: savedRevision.id },
+      'request-restore',
+    );
+    const contentHash = createHash('sha256')
+      .update(historicalContent)
+      .digest('hex');
+
+    expect(room.getText('content').toJSON()).toBe(historicalContent);
+    expect(storeState).toHaveBeenCalledOnce();
+    expect(restoreRevision).toHaveBeenCalledWith(
+      userId,
+      documentId,
+      baseRevisionId,
+      { baseRevisionId: savedRevision.id },
+      'request-restore',
+    );
+    expect(result).toEqual({
+      documentId,
+      currentRevision: restoredRevision,
+      contentHash,
+    });
+    expect(broadcastStateless).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'document-restored',
+        ...restoredRevision,
+        contentHash,
+      }),
+    );
+    expect(closeConnections).toHaveBeenCalledWith(documentId);
+
+    await roomConnection.disconnect();
+    initialDocument.destroy();
+  });
 });

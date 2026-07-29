@@ -1,38 +1,42 @@
-# MyMD
+# TeamMD
 
-MyMD is a planned online Markdown workspace built around Vditor. Users will be able to register with email and password, organize Markdown documents in folders, explicitly save immutable revisions, share selected documents, and review or restore history.
+TeamMD is an online Markdown workspace with email/password accounts, personal folders, explicit immutable revision checkpoints, and document sharing. CodeMirror is the writable collaborative editor; Vditor renders the sanitized Markdown preview.
 
-The repository now includes a runnable authentication slice: shared Zod contracts, a Fastify API with Argon2id and revocable cookie sessions, MySQL migrations, and responsive React sign-in/register screens. Files, folders, Vditor editing, revisions, and invitations remain planned implementation phases.
+The repository includes a runnable React application, shared Zod contracts, a Fastify API with Argon2id and revocable cookie sessions, reviewed MySQL migrations, and a Yjs/Hocuspocus collaboration gateway. Registered users can organize documents, edit the same document concurrently, create and restore explicit revision checkpoints, share documents directly with other registered accounts, and publish revocable read-only links to the current saved revision. Tokenized invitations for unregistered email recipients remain planned.
 
 ## MVP At A Glance
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- Vditor editing with explicit Save and clear dirty/saving/saved/conflict states
+- CodeMirror/Yjs editing with Vditor preview and explicit Save states
 - Immutable revision snapshots with history and restore
-- Document invitations and `owner`, `editor`, or `viewer` access
-- Optimistic concurrency that rejects stale saves instead of overwriting them
+- Direct document sharing with `owner`, `editor`, or `viewer` access
+- Owner-managed, revocable public links to the current saved revision
+- CRDT convergence without whole-document last-write-wins replacement
 - Trash and restore for documents and folders
 
-Live cursors, presence, comments, offline editing, mobile-native apps, public links, and CRDT-based simultaneous editing are later phases.
+CRDT-based simultaneous editing is implemented. The Yjs awareness channel and CodeMirror binding provide an ephemeral participant count and remote selections/cursors, using generic collaborator labels rather than exposing account identities. Public links are read-only, expose no private hierarchy or collaborator metadata, and never publish unsaved Yjs drafts. Comments, durable offline-first editing, pending-email invitations, and native applications remain later phases.
 
-## Planned Stack
+Transient network interruptions are handled by Hocuspocus reconnect and durable server-side Yjs state. True offline-first editing is intentionally deferred: it requires persistent browser-side Yjs storage, bounded offline queues, generation-aware restore and revocation handling, and tested reconciliation before it can meet TeamMD's no-data-loss standard.
 
-| Area      | Choice                                             |
-| --------- | -------------------------------------------------- |
-| Web       | React 19, Vite, TypeScript, Vditor, TanStack Query |
-| API       | Node.js 22 LTS, Fastify, TypeScript, Zod           |
-| Data      | MySQL 8.4, Prisma migrations                       |
-| Auth      | Argon2id, opaque cookie sessions, CSRF protection  |
-| Tests     | Vitest, Fastify injection, Playwright              |
-| Workspace | pnpm monorepo                                      |
+## Stack
+
+| Area          | Choice                                                         |
+| ------------- | -------------------------------------------------------------- |
+| Web           | React 19, Vite, TypeScript, CodeMirror, Vditor, TanStack Query |
+| Collaboration | Yjs, Hocuspocus, `y-codemirror.next`                           |
+| API           | Node.js 22 LTS, Fastify, TypeScript, Zod                       |
+| Data          | MySQL 8.4, Prisma migrations                                   |
+| Auth          | Argon2id, opaque cookie sessions, CSRF protection              |
+| Tests         | Vitest and Fastify injection                                   |
+| Workspace     | pnpm monorepo                                                  |
 
 ## Repository Layout
 
 ```text
 apps/
-  web/                 Browser UI and Vditor integration
-  api/                 HTTP API and application services
+  web/                 Browser UI, collaborative editor, and Vditor preview
+  api/                 HTTP API, collaboration gateway, and services
 packages/
   contracts/           Shared Zod contracts and types
   config/              Validated environment configuration
@@ -49,23 +53,24 @@ Prerequisites are Node.js 22+, pnpm 10+, and access to MySQL 8.4 at the configur
 ```powershell
 Copy-Item .env.example .env.local
 pnpm install
-pnpm --filter @mymd/api prisma:migrate
+pnpm --filter @teammd/api prisma:migrate
 pnpm dev
 ```
 
-Set `DATABASE_URL` in the ignored `.env.local` file before running migrations. The local least-privilege database user applies reviewed migrations with `prisma migrate deploy`; it does not need permission to create Prisma shadow databases. Email delivery uses a configurable SMTP service and is not required for the initial authentication slice.
+Set `DATABASE_URL` in the ignored `.env.local` file before running migrations. The local least-privilege database user applies reviewed migrations with `prisma migrate deploy`; it does not need permission to create Prisma shadow databases.
 
-Planned local endpoints:
+Local endpoints:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:3000`
+- Collaboration WebSocket: `ws://localhost:3001`
 
 ## Documentation
 
 - `docs/product-requirements.md`: scope, requirements, and acceptance criteria
 - `docs/architecture.md`: components, flows, and dependency boundaries
 - `docs/data-model.md`: entities, constraints, and revision semantics
-- `docs/api-contract.md`: planned HTTP contract
+- `docs/api-contract.md`: HTTP and collaboration contract
 - `docs/security.md`: threat model and controls
 - `docs/development.md`: setup and contribution workflow
 - `docs/testing-strategy.md`: test pyramid and quality gates

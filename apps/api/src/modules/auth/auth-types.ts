@@ -1,4 +1,4 @@
-import type { UserDto } from '@mymd/contracts';
+import type { UserDto } from '@teammd/contracts';
 
 export type AuthenticatedSession = {
   id: string;

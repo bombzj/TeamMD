@@ -1,4 +1,4 @@
-import { parseServerConfig } from '@mymd/config';
+import { parseServerConfig } from '@teammd/config';
 import dotenv from 'dotenv';
 
 import { buildApp } from './app.js';

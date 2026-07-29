@@ -1,5 +1,5 @@
 {
-  "name": "@mymd/api",
+  "name": "@teammd/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "@fastify/helmet": "^13.0.1",
     "@fastify/rate-limit": "^10.3.0",
     "@hocuspocus/server": "4.4.0",
-    "@mymd/config": "workspace:*",
-    "@mymd/contracts": "workspace:*",
+    "@teammd/config": "workspace:*",
+    "@teammd/contracts": "workspace:*",
     "@prisma/client": "^6.12.0",
     "argon2": "^0.43.1",
     "dotenv": "^16.6.1",

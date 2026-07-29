@@ -177,4 +177,51 @@ describe('SharingService with MySQL', () => {
       code: 'VALIDATION_ERROR',
     });
   });
+
+  it('creates and revokes an owner-managed read-only public link', async () => {
+    const initial = await workspaceService.getDocument(ownerId, documentId);
+    await workspaceService.saveDocument(
+      ownerId,
+      documentId,
+      {
+        baseRevisionId: initial.currentRevision.id,
+        content: '# Public plan\n',
+      },
+      `sharing-public-save-${testSuffix}`,
+    );
+
+    const created = await sharingService.createPublicLink(
+      ownerId,
+      documentId,
+      `sharing-public-create-${testSuffix}`,
+    );
+    expect(created.token).toHaveLength(43);
+    expect(
+      await sharingService.getPublicLinkStatus(ownerId, documentId),
+    ).toEqual({ enabled: true, createdAt: created.createdAt });
+    await expect(
+      sharingService.getPublicLinkStatus(collaboratorId, documentId),
+    ).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' });
+
+    const stored = await prisma.documentPublicLink.findUniqueOrThrow({
+      where: { documentId },
+    });
+    expect(stored.tokenHash).not.toBe(created.token);
+    await expect(
+      sharingService.resolvePublicDocument(created.token),
+    ).resolves.toMatchObject({
+      name: 'Shared plan.md',
+      content: '# Public plan\n',
+      currentRevision: { ordinal: 2 },
+    });
+
+    await sharingService.revokePublicLink(
+      ownerId,
+      documentId,
+      `sharing-public-revoke-${testSuffix}`,
+    );
+    await expect(
+      sharingService.resolvePublicDocument(created.token),
+    ).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', statusCode: 404 });
+  });
 });

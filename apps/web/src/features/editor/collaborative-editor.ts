@@ -13,9 +13,10 @@ import {
 } from '@codemirror/view';
 import {
   collaborationCheckpointEventSchema,
+  collaborationRestoreEventSchema,
   type CollaborationCheckpointEvent,
   type CollaborationTicketResponse,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider';
 import Vditor from 'vditor';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
@@ -31,11 +32,13 @@ type CollaborativeEditorOptions = {
   initialContent: string;
   createTicket: () => Promise<CollaborationTicketResponse>;
   onCheckpoint: (checkpoint: CollaborationCheckpointEvent) => void;
+  onRestore: () => void;
   onContentChange: (content: string) => void;
   onError: (message: string) => void;
   onPermissionChange: (
     permission: CollaborationTicketResponse['permission'],
   ) => void;
+  onPresenceChange: (participantCount: number) => void;
   onTransportChange: (transport: CollaborationTransport) => void;
 };
 
@@ -91,18 +94,26 @@ export async function createCollaborativeEditor(
     onAuthenticationFailed: ({ reason }) => {
       options.onError(reason || 'The collaboration connection was rejected.');
     },
+    onAwarenessChange: ({ states }) => {
+      options.onPresenceChange(states.length);
+    },
     onStateless: ({ payload }) => {
       try {
-        const checkpoint = collaborationCheckpointEventSchema.parse(
-          JSON.parse(payload),
-        );
-        options.onCheckpoint(checkpoint);
+        const value: unknown = JSON.parse(payload);
+        const checkpoint = collaborationCheckpointEventSchema.safeParse(value);
+        if (checkpoint.success) {
+          options.onCheckpoint(checkpoint.data);
+          return;
+        }
+        collaborationRestoreEventSchema.parse(value);
+        options.onRestore();
       } catch {
         options.onError('The collaboration server sent an invalid update.');
       }
     },
   });
   provider.setAwarenessField('user', collaborationIdentity());
+  options.onPresenceChange(provider.awareness?.getStates().size ?? 1);
 
   const undoManager = new Y.UndoManager(yText);
   const state = EditorState.create({

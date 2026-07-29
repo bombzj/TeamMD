@@ -1,4 +1,4 @@
-import type { AuthResponse } from '@mymd/contracts';
+import type { AuthResponse } from '@teammd/contracts';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';

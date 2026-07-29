@@ -15,6 +15,7 @@ erDiagram
   User ||--o{ DocumentRevision : authors
   Document ||--o{ DocumentAccess : grants
   User ||--o{ DocumentAccess : receives
+  Document ||--o| DocumentPublicLink : publishes
   Document ||--o{ AuditEvent : records
   Document ||--o| CollaborationState : synchronizes
   Document ||--o{ CollaborationTicket : authorizes
@@ -98,17 +99,27 @@ Constraints prohibit access rows for the owner. Deleting or trashing a document 
 
 ### `CollaborationState`
 
-| Field                  | Notes                                                        |
-| ---------------------- | ------------------------------------------------------------ |
-| `documentId`           | One operational state per document                           |
-| `generation`           | Reserved for future compaction or format migration           |
-| `yjsState`             | Compacted Yjs update; durable operational state, not history |
-| `checkpointRevisionId` | Immutable revision represented by the latest explicit Save   |
-| `updatedAt`            | Last operational-state persistence time                      |
+| Field                  | Notes                                                               |
+| ---------------------- | ------------------------------------------------------------------- |
+| `documentId`           | One operational state per document                                  |
+| `generation`           | Incremented when restore replaces the authoritative room generation |
+| `yjsState`             | Compacted Yjs update; durable operational state, not history        |
+| `checkpointRevisionId` | Immutable revision represented by the latest explicit Save          |
+| `updatedAt`            | Last operational-state persistence time                             |
 
 ### `CollaborationTicket`
 
 One-time, document-scoped WebSocket credentials store only a token hash and bind the document, user, and authenticated session. Tickets expire after one minute and become invalid after first consumption. Session and document access are revalidated during consumption.
+
+### `DocumentPublicLink`
+
+| Field                    | Notes                                                    |
+| ------------------------ | -------------------------------------------------------- |
+| `documentId`             | Primary key; at most one active public link per document |
+| `tokenHash`              | Unique SHA-256 hash of a 256-bit URL-safe bearer token   |
+| `createdAt`, `updatedAt` | Creation and rotation timestamps                         |
+
+The raw token is returned once when an owner creates or rotates a link and is never stored. Public resolution hashes the submitted token, rejects trashed documents and documents hidden by trashed ancestors, and reads only `Document.currentRevisionId`. Permanent document deletion cascades the link. Revocation deletes the row; rotation replaces the hash and immediately invalidates the previous token.
 
 ### Planned `Invitation`
 
@@ -150,6 +161,16 @@ A unique `(documentId, ordinal)` constraint is the final guard against duplicate
 6. Broadcast validated revision metadata and the saved content hash to room clients.
 
 WebSocket synchronization and operational-state persistence do not mean Saved. Only this explicit checkpoint advances immutable history.
+
+## Revision Restore Transaction
+
+1. Lock the document and revalidate owner/editor access.
+2. Verify the submitted `baseRevisionId` is still the current head and the selected revision belongs to the document.
+3. Insert a new immutable revision with copied Markdown, integrity metadata, restoring author, and `restoredFromRevisionId` lineage.
+4. Advance the document head and, when collaboration state exists, replace compacted Yjs state, advance `checkpointRevisionId`, and increment `generation` in the same transaction.
+5. Replace the active room text, persist that exact Yjs state, emit a restore control event, and disconnect clients so each creates a fresh local `Y.Doc` for the new generation.
+
+Existing revisions are never updated. A stale local CRDT document is never merged into a restored generation.
 
 ## Deletion And Retention
 

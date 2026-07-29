@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file is the authoritative engineering guide for humans and coding agents working in MyMD.
+This file is the authoritative engineering guide for humans and coding agents working in TeamMD.
 
 ## Mission
 

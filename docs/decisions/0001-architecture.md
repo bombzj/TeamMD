@@ -1,11 +1,11 @@
 # ADR 0001: TypeScript Modular Monolith With Explicit Revision Saves
 
-- **Status:** Accepted for initial implementation
+- **Status:** Accepted; real-time deferral superseded by ADR 0002
 - **Date:** 2026-07-27
 
 ## Context
 
-MyMD needs browser editing, identity, hierarchical organization, document-level sharing, and trustworthy history. The product may later support Google Docs-style simultaneous editing, but the first version intentionally uses a Save button. Introducing CRDT synchronization, presence, durable updates, and offline reconciliation now would materially increase operational and product complexity before core authorization and recovery behavior are proven.
+TeamMD needs browser editing, identity, hierarchical organization, document-level sharing, and trustworthy history. The product may later support Google Docs-style simultaneous editing, but the first version intentionally uses a Save button. Introducing CRDT synchronization, presence, durable updates, and offline reconciliation now would materially increase operational and product complexity before core authorization and recovery behavior are proven.
 
 ## Decision
 
@@ -15,7 +15,7 @@ MyMD needs browser editing, identity, hierarchical organization, document-level 
 4. Require `baseRevisionId` on saves and reject a stale base with `409 REVISION_CONFLICT`.
 5. Scope sharing to individual documents with `owner`, `editor`, and `viewer` roles.
 6. Use opaque server-side sessions in secure HttpOnly cookies rather than browser-stored bearer tokens.
-7. Treat real-time collaboration as a later Yjs/WebSocket subsystem that periodically creates immutable Markdown checkpoints.
+7. Initially defer real-time collaboration while preserving a boundary for future Yjs/WebSocket checkpoints. ADR 0002 later accepts and implements that boundary.
 
 ## Consequences
 

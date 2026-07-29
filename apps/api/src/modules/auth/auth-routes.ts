@@ -1,4 +1,4 @@
-import { loginRequestSchema, registerRequestSchema } from '@mymd/contracts';
+import { loginRequestSchema, registerRequestSchema } from '@teammd/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { ApiError } from '../../lib/api-error.js';
@@ -9,9 +9,9 @@ import {
 } from './auth-guards.js';
 import type { AuthService, CreatedSession } from './auth-service.js';
 
-const productionSessionCookie = '__Host-mymd_session';
-const developmentSessionCookie = 'mymd_session';
-const csrfCookie = 'mymd_csrf';
+const productionSessionCookie = '__Host-teammd_session';
+const developmentSessionCookie = 'teammd_session';
+const csrfCookie = 'teammd_csrf';
 
 type AuthRouteOptions = {
   authService: AuthService;

@@ -8,6 +8,11 @@ import {
   documentSummarySchema,
   errorResponseSchema,
   folderSchema,
+  publicDocumentResponseSchema,
+  publicLinkCreateResponseSchema,
+  publicLinkStatusSchema,
+  revisionContentResponseSchema,
+  revisionListResponseSchema,
   saveDocumentResponseSchema,
   sharedDocumentListResponseSchema,
   trashResponseSchema,
@@ -25,6 +30,12 @@ import {
   type FolderDto,
   type LoginRequest,
   type RegisterRequest,
+  type PublicDocumentResponse,
+  type PublicLinkCreateResponse,
+  type PublicLinkStatus,
+  type RestoreRevisionRequest,
+  type RevisionContentResponse,
+  type RevisionListResponse,
   type SaveDocumentRequest,
   type SaveDocumentResponse,
   type SharedDocumentListResponse,
@@ -32,7 +43,7 @@ import {
   type UpdateDocumentRequest,
   type UpdateFolderRequest,
   type WorkspaceTreeResponse,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 
 export class ApiClientError extends Error {
   public constructor(
@@ -217,11 +228,86 @@ export async function createCollaborationTicket(
 
 export async function checkpointCollaboration(
   documentId: string,
+  saveMessage?: string,
 ): Promise<CollaborationCheckpointResponse> {
   return requestJson(
     `/api/v1/documents/${documentId}/collaboration-checkpoint`,
-    mutation('POST', {}),
+    mutation('POST', saveMessage ? { saveMessage } : {}),
     (value) => collaborationCheckpointResponseSchema.parse(value),
+  );
+}
+
+export async function loadRevisions(
+  documentId: string,
+): Promise<RevisionListResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/revisions`,
+    undefined,
+    (value) => revisionListResponseSchema.parse(value),
+  );
+}
+
+export async function loadRevision(
+  documentId: string,
+  revisionId: string,
+): Promise<RevisionContentResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/revisions/${revisionId}`,
+    undefined,
+    (value) => revisionContentResponseSchema.parse(value),
+  );
+}
+
+export async function restoreRevision(
+  documentId: string,
+  revisionId: string,
+  input: RestoreRevisionRequest,
+): Promise<CollaborationCheckpointResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/revisions/${revisionId}/restore`,
+    mutation('POST', input),
+    (value) => collaborationCheckpointResponseSchema.parse(value),
+  );
+}
+
+export async function loadPublicLinkStatus(
+  documentId: string,
+): Promise<PublicLinkStatus> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/public-link`,
+    undefined,
+    (value) => publicLinkStatusSchema.parse(value),
+  );
+}
+
+export async function createPublicLink(
+  documentId: string,
+): Promise<PublicLinkCreateResponse> {
+  return requestJson(
+    `/api/v1/documents/${documentId}/public-link`,
+    mutation('POST', {}),
+    (value) => publicLinkCreateResponseSchema.parse(value),
+  );
+}
+
+export async function revokePublicLink(documentId: string): Promise<void> {
+  return requestEmpty(
+    `/api/v1/documents/${documentId}/public-link`,
+    mutation('DELETE'),
+  );
+}
+
+export async function loadPublicDocument(
+  token: string,
+): Promise<PublicDocumentResponse> {
+  return requestJson(
+    '/api/v1/public/documents/resolve',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    },
+    (value) => publicDocumentResponseSchema.parse(value),
   );
 }
 

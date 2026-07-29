@@ -1,4 +1,4 @@
-import type { AuthResponse } from '@mymd/contracts';
+import type { AuthResponse } from '@teammd/contracts';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
@@ -33,7 +33,7 @@ export function AuthScreen({
       setError(
         caught instanceof ApiClientError
           ? caught.message
-          : 'Unable to reach MyMD. Try again.',
+          : 'Unable to reach TeamMD. Try again.',
       );
     } finally {
       setSubmitting(false);
@@ -50,7 +50,7 @@ export function AuthScreen({
       <section className="auth-story" aria-labelledby="product-name">
         <div className="story-content">
           <div className="wordmark" id="product-name">
-            MyMD
+            TeamMD
           </div>
           <div className="story-rule" />
           <p className="story-kicker">A Markdown workspace</p>

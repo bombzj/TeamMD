@@ -99,6 +99,7 @@ model Document {
   accesses          DocumentAccess[]
   collaborationState CollaborationState?
   collaborationTickets CollaborationTicket[]
+  publicLink        DocumentPublicLink?
 
   @@unique([ownerId, parentKey, activeNameKey])
   @@index([ownerId, folderId, trashedAt])
@@ -173,4 +174,14 @@ model CollaborationState {
   document             Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([updatedAt])
+}
+
+model DocumentPublicLink {
+  documentId String   @id @db.VarChar(30)
+  tokenHash  String   @unique @db.Char(64)
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @db.DateTime(3)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
 }

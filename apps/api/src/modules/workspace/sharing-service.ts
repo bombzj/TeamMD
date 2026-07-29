@@ -1,11 +1,15 @@
 import type {
   CollaboratorDto,
   CollaboratorRole,
+  PublicDocumentResponse,
+  PublicLinkCreateResponse,
+  PublicLinkStatus,
   SharedDocumentSummary,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { ApiError } from '../../lib/api-error.js';
+import { createOpaqueToken, hashToken } from '../../lib/tokens.js';
 import { normalizeEmail } from '../auth/auth-service.js';
 import { requireDocumentAccess } from './document-access-policy.js';
 
@@ -193,6 +197,102 @@ export class SharingService {
       );
     });
   }
+
+  public async getPublicLinkStatus(
+    ownerId: string,
+    documentId: string,
+  ): Promise<PublicLinkStatus> {
+    await requireOwner(this.prisma, ownerId, documentId);
+    const link = await this.prisma.documentPublicLink.findUnique({
+      where: { documentId },
+      select: { createdAt: true },
+    });
+    return {
+      enabled: link !== null,
+      createdAt: link?.createdAt.toISOString() ?? null,
+    };
+  }
+
+  public async createPublicLink(
+    ownerId: string,
+    documentId: string,
+    requestId: string,
+  ): Promise<PublicLinkCreateResponse> {
+    const token = createOpaqueToken();
+    const link = await this.prisma.$transaction(async (transaction) => {
+      await requireOwner(transaction, ownerId, documentId);
+      const created = await transaction.documentPublicLink.upsert({
+        where: { documentId },
+        create: { documentId, tokenHash: hashToken(token) },
+        update: { tokenHash: hashToken(token) },
+      });
+      await createAuditEvent(
+        transaction,
+        ownerId,
+        'DOCUMENT_PUBLIC_LINK_CREATE',
+        requestId,
+        { documentId },
+      );
+      return created;
+    });
+    return { token, createdAt: link.createdAt.toISOString() };
+  }
+
+  public async revokePublicLink(
+    ownerId: string,
+    documentId: string,
+    requestId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      await requireOwner(transaction, ownerId, documentId);
+      const removed = await transaction.documentPublicLink.deleteMany({
+        where: { documentId },
+      });
+      if (removed.count === 0) throw publicLinkNotFound();
+      await createAuditEvent(
+        transaction,
+        ownerId,
+        'DOCUMENT_PUBLIC_LINK_REVOKE',
+        requestId,
+        { documentId },
+      );
+    });
+  }
+
+  public async resolvePublicDocument(
+    token: string,
+  ): Promise<PublicDocumentResponse> {
+    const link = await this.prisma.documentPublicLink.findUnique({
+      where: { tokenHash: hashToken(token) },
+      include: { document: true },
+    });
+    if (link === null || link.document.trashedAt !== null) {
+      throw publicLinkNotFound();
+    }
+    try {
+      await assertPublicDocumentVisible(
+        this.prisma,
+        link.document.ownerId,
+        link.document.folderId,
+      );
+    } catch {
+      throw publicLinkNotFound();
+    }
+    if (link.document.currentRevisionId === null) throw integrityError();
+    const revision = await this.prisma.documentRevision.findUnique({
+      where: { id: link.document.currentRevisionId },
+    });
+    if (revision === null) throw integrityError();
+    return {
+      name: link.document.name,
+      content: revision.content,
+      currentRevision: {
+        id: revision.id,
+        ordinal: revision.ordinal,
+        createdAt: revision.createdAt.toISOString(),
+      },
+    };
+  }
 }
 
 async function requireOwner(
@@ -251,6 +351,34 @@ function documentNotFound(): ApiError {
 
 function collaboratorNotFound(): ApiError {
   return new ApiError(404, 'RESOURCE_NOT_FOUND', 'Collaborator not found.');
+}
+
+function publicLinkNotFound(): ApiError {
+  return new ApiError(404, 'RESOURCE_NOT_FOUND', 'Public link not found.');
+}
+
+async function assertPublicDocumentVisible(
+  prisma: PrismaClient,
+  ownerId: string,
+  folderId: string | null,
+): Promise<void> {
+  if (folderId === null) return;
+  const folders = await prisma.folder.findMany({
+    where: { ownerId },
+    select: { id: true, parentId: true, trashedAt: true },
+  });
+  const byId = new Map(folders.map((folder) => [folder.id, folder]));
+  const visited = new Set<string>();
+  let currentId: string | null = folderId;
+  while (currentId !== null) {
+    if (visited.has(currentId)) throw publicLinkNotFound();
+    visited.add(currentId);
+    const folder = byId.get(currentId);
+    if (folder === undefined || folder.trashedAt !== null) {
+      throw publicLinkNotFound();
+    }
+    currentId = folder.parentId;
+  }
 }
 
 function integrityError(): ApiError {

@@ -4,13 +4,16 @@ import type {
   DocumentContentResponse,
   DocumentSummaryDto,
   FolderDto,
+  RevisionContentResponse,
+  RevisionListResponse,
+  RestoreRevisionRequest,
   SaveDocumentRequest,
   SaveDocumentResponse,
   TrashResponse,
   UpdateDocumentRequest,
   UpdateFolderRequest,
   WorkspaceTreeResponse,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import {
   Prisma,
   type Document,
@@ -19,6 +22,7 @@ import {
   type PrismaClient,
 } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import * as Y from 'yjs';
 
 import { ApiError } from '../../lib/api-error.js';
 import { requireDocumentAccess } from './document-access-policy.js';
@@ -391,6 +395,34 @@ export class WorkspaceService {
     };
   }
 
+  public async listRevisions(
+    userId: string,
+    documentId: string,
+  ): Promise<RevisionListResponse> {
+    await requireDocumentAccess(this.prisma, userId, documentId, 'write');
+    const revisions = await this.prisma.documentRevision.findMany({
+      where: { documentId },
+      include: { author: { select: { email: true } } },
+      orderBy: { ordinal: 'desc' },
+      take: 200,
+    });
+    return { revisions: revisions.map(toRevisionHistoryItem) };
+  }
+
+  public async getRevision(
+    userId: string,
+    documentId: string,
+    revisionId: string,
+  ): Promise<RevisionContentResponse> {
+    await requireDocumentAccess(this.prisma, userId, documentId, 'write');
+    const revision = await this.prisma.documentRevision.findFirst({
+      where: { id: revisionId, documentId },
+      include: { author: { select: { email: true } } },
+    });
+    if (revision === null) throw notFound('Document');
+    return { ...toRevisionHistoryItem(revision), content: revision.content };
+  }
+
   public async saveDocument(
     userId: string,
     documentId: string,
@@ -481,6 +513,92 @@ export class WorkspaceService {
         revisionId: revision.id,
         ordinal: revision.ordinal,
       });
+      return {
+        documentId,
+        currentRevision: toRevisionSummary(revision),
+      };
+    });
+  }
+
+  public async restoreRevision(
+    userId: string,
+    documentId: string,
+    revisionId: string,
+    input: RestoreRevisionRequest,
+    requestId: string,
+  ): Promise<SaveDocumentResponse> {
+    return this.prisma.$transaction(async (transaction) => {
+      const locked = await transaction.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM Document
+        WHERE id = ${documentId}
+        FOR UPDATE
+      `;
+      if (locked.length === 0) throw notFound('Document');
+
+      const access = await requireDocumentAccess(
+        transaction,
+        userId,
+        documentId,
+        'write',
+      );
+      const currentRevision = await requireCurrentRevision(
+        transaction,
+        access.document.currentRevisionId,
+      );
+      if (currentRevision.id !== input.baseRevisionId) {
+        throw revisionConflict(input.baseRevisionId, currentRevision);
+      }
+      const sourceRevision = await transaction.documentRevision.findFirst({
+        where: { id: revisionId, documentId },
+      });
+      if (sourceRevision === null) throw notFound('Document');
+
+      const revision = await transaction.documentRevision.create({
+        data: {
+          documentId,
+          ordinal: currentRevision.ordinal + 1,
+          authorId: userId,
+          content: sourceRevision.content,
+          byteSize: sourceRevision.byteSize,
+          contentHash: sourceRevision.contentHash,
+          restoredFromRevisionId: sourceRevision.id,
+          ...(input.saveMessage === undefined
+            ? {}
+            : { saveMessage: input.saveMessage }),
+        },
+      });
+      await transaction.document.update({
+        where: { id: documentId },
+        data: { currentRevisionId: revision.id },
+      });
+      const collaborationState =
+        await transaction.collaborationState.findUnique({
+          where: { documentId },
+          select: { documentId: true },
+        });
+      if (collaborationState !== null) {
+        await transaction.collaborationState.update({
+          where: { documentId },
+          data: {
+            generation: { increment: 1 },
+            yjsState: Buffer.from(encodeMarkdownState(sourceRevision.content)),
+            checkpointRevisionId: revision.id,
+          },
+        });
+      }
+      await createAuditEvent(
+        transaction,
+        userId,
+        'DOCUMENT_REVISION_RESTORE',
+        requestId,
+        {
+          documentId,
+          revisionId: revision.id,
+          restoredFromRevisionId: sourceRevision.id,
+          ordinal: revision.ordinal,
+        },
+      );
       return {
         documentId,
         currentRevision: toRevisionSummary(revision),
@@ -769,6 +887,18 @@ function toRevisionSummary(revision: DocumentRevision) {
   };
 }
 
+function toRevisionHistoryItem(
+  revision: DocumentRevision & { author: { email: string } },
+) {
+  return {
+    ...toRevisionSummary(revision),
+    author: { id: revision.authorId, email: revision.author.email },
+    byteSize: revision.byteSize,
+    saveMessage: revision.saveMessage,
+    restoredFromRevisionId: revision.restoredFromRevisionId,
+  };
+}
+
 function mapNameConflict(error: unknown): unknown {
   if (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -824,4 +954,14 @@ function integrityError(): ApiError {
     'INTERNAL_ERROR',
     'The document revision state is invalid.',
   );
+}
+
+function encodeMarkdownState(content: string): Uint8Array {
+  const document = new Y.Doc();
+  try {
+    if (content.length > 0) document.getText('content').insert(0, content);
+    return Y.encodeStateAsUpdate(document);
+  } finally {
+    document.destroy();
+  }
 }

@@ -1,7 +1,7 @@
 import type {
   CollaborationTicketResponse,
   DocumentContentResponse,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import * as Y from 'yjs';
 

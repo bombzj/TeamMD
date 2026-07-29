@@ -2,9 +2,9 @@
 
 ## Assets And Trust Boundaries
 
-Protected assets include Markdown content and history, account identity, permissions, invitations, sessions, audit evidence, and backups. The browser, email links, reverse proxy, API, MySQL, SMTP provider, logs, CI, and administrator access are separate trust boundaries.
+Protected assets include Markdown content and history, account identity, permissions, public-link and invitation bearer tokens, sessions, audit evidence, and backups. The browser, public/email links, reverse proxy, API, MySQL, SMTP provider, logs, CI, and administrator access are separate trust boundaries.
 
-Primary threats are credential stuffing, account/session theft, CSRF, stored XSS through Markdown, broken object-level authorization, invitation theft, email/account enumeration, stale-write data loss, denial of service through large content/tree operations, dependency compromise, secret leakage, and destructive operator mistakes.
+Primary threats are credential stuffing, account/session theft, CSRF, stored XSS through Markdown, broken object-level authorization, bearer-link theft, email/account enumeration, stale-write data loss, denial of service through large content/tree operations, dependency compromise, secret leakage, and destructive operator mistakes.
 
 ## Authentication
 
@@ -23,7 +23,7 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Require a session-bound CSRF token and strict `Origin`/`Referer` validation for every mutation. CORS allows only configured origins with credentials.
 - Recheck expiry, revocation, disabled user state, and session epoch server-side.
 - Support current-session logout, individual session revocation, and logout-all. Password reset revokes all existing sessions.
-- Never place session, invitation, verification, or reset tokens in logs, analytics, referrer-leaking pages, or browser storage.
+- Never place session, public-link, invitation, verification, or reset tokens in logs, analytics, referrer-leaking pages, or persistent browser storage.
 
 ## Authorization
 
@@ -35,6 +35,15 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Revalidate access inside save and sharing transactions. Cached client data never grants rights.
 - WebSocket authentication uses short-lived one-time tickets bound to the authenticated session, user, and document. Access is revalidated when each ticket is consumed.
 - Grant, role change, and revocation close the active document room. Every reconnect requires a fresh ticket and current API authorization, so revoked users cannot retain an already-open socket.
+
+## Public-Link Security
+
+- Public links are bearer credentials with at least 256 bits of cryptographic randomness. Store only a SHA-256 token hash and compare by indexed hash lookup.
+- Put the raw token in the URL fragment, never the path or query string. The public page removes the fragment from the address bar before sending the token in a JSON POST body to one fixed resolver endpoint.
+- Return the raw token only when creating or rotating a link. Status endpoints expose only enabled state and creation time; they cannot recover an existing token.
+- Public resolution is read-only, rate-limited, and `private, no-store`. Invalid, revoked, trashed, and hidden resources use one generic not-found response.
+- Expose only document name, current saved Markdown, and current revision summary. Never expose Yjs drafts, history, owner identity, collaborators, or folder hierarchy.
+- Rotation invalidates the previous token; revocation deletes the token hash. Link management is owner-only, CSRF-protected, origin-validated, and audited.
 
 ## Markdown And Browser Security
 
@@ -52,12 +61,13 @@ Initial proposals, configurable after measurement:
 - Markdown content: 2 MiB UTF-8 per save
 - Filename/folder name: 255 Unicode characters after normalization checks
 - Save message: 500 characters
+- Public-link token: exactly 43 URL-safe base64 characters
 - Folder depth: 20
 - Page size: default 50, maximum 100
 - Active invitations: 100 per owner and 20 per document
 - Request body: route-specific; never an unbounded global parser
 
-Enforce limits in Zod and at transport/database boundaries. Rate-limit authentication, invitation, save, tree mutation, and permanent deletion separately. Time out requests and database queries; cap connection pools per API instance.
+Enforce limits in Zod and at transport/database boundaries. Rate-limit authentication, public-link resolution/management, invitation, save, tree mutation, and permanent deletion separately. Time out requests and database queries; cap connection pools per API instance.
 
 ## Secrets And Development Credentials
 

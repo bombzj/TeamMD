@@ -1,6 +1,6 @@
 # ADR 0002: Yjs Collaboration With Immutable Checkpoints
 
-- **Status:** Accepted for incremental implementation
+- **Status:** Accepted and implemented
 - **Date:** 2026-07-28
 
 ## Context

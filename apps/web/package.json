@@ -1,5 +1,5 @@
 {
-  "name": "@mymd/web",
+  "name": "@teammd/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "@fontsource/ibm-plex-sans": "^5.2.6",
     "@fontsource/newsreader": "^5.2.6",
     "@hocuspocus/provider": "4.4.0",
-    "@mymd/contracts": "workspace:*",
+    "@teammd/contracts": "workspace:*",
     "@tanstack/react-query": "^5.83.0",
     "lucide-react": "^0.536.0",
     "react": "^19.1.0",

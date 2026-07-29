@@ -5,6 +5,12 @@ import {
   createFolderRequestSchema,
   documentContentResponseSchema,
   collaboratorListResponseSchema,
+  publicDocumentRequestSchema,
+  publicDocumentResponseSchema,
+  publicLinkCreateResponseSchema,
+  restoreRevisionRequestSchema,
+  revisionContentResponseSchema,
+  revisionListResponseSchema,
   saveDocumentRequestSchema,
   saveDocumentResponseSchema,
   updateFolderRequestSchema,
@@ -190,6 +196,65 @@ describe('workspace contracts', () => {
         role: 'viewer',
         documentId: 'not-accepted',
       }),
+    ).toThrow();
+  });
+
+  it('validates immutable history and restore contracts', () => {
+    const revision = {
+      id: 'cm1234567890revisionabcdef',
+      ordinal: 3,
+      author: {
+        id: 'cm1234567890userabcdefgh',
+        email: 'author@example.test',
+      },
+      byteSize: 12,
+      saveMessage: 'Clarify title',
+      restoredFromRevisionId: null,
+      createdAt: '2026-07-28T00:00:00.000Z',
+    };
+    expect(
+      revisionListResponseSchema.parse({ revisions: [revision] }).revisions[0]
+        ?.ordinal,
+    ).toBe(3);
+    expect(
+      revisionContentResponseSchema.parse({
+        ...revision,
+        content: '# Updated\n',
+      }).content,
+    ).toBe('# Updated\n');
+    expect(
+      restoreRevisionRequestSchema.parse({
+        baseRevisionId: 'cm1234567890revisioncurrent',
+        saveMessage: 'Restore stable version',
+      }),
+    ).toEqual({
+      baseRevisionId: 'cm1234567890revisioncurrent',
+      saveMessage: 'Restore stable version',
+    });
+  });
+
+  it('validates public-link tokens and read-only document responses', () => {
+    const token = 'a'.repeat(43);
+    expect(publicDocumentRequestSchema.parse({ token })).toEqual({ token });
+    expect(
+      publicLinkCreateResponseSchema.parse({
+        token,
+        createdAt: '2026-07-28T00:00:00.000Z',
+      }).token,
+    ).toBe(token);
+    expect(
+      publicDocumentResponseSchema.parse({
+        name: 'Published.md',
+        content: '# Public\n',
+        currentRevision: {
+          id: 'cm1234567890revisionabcdef',
+          ordinal: 2,
+          createdAt: '2026-07-28T00:00:00.000Z',
+        },
+      }).content,
+    ).toBe('# Public\n');
+    expect(() =>
+      publicDocumentRequestSchema.parse({ token: 'short' }),
     ).toThrow();
   });
 });

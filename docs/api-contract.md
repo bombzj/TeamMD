@@ -4,11 +4,11 @@ All endpoints are under `/api/v1`, use JSON, and validate request and response p
 
 ## Conventions
 
-- Session cookie: `__Host-mymd_session` in production, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`.
+- Session cookie: `__Host-teammd_session` in production, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`.
 - State-changing requests require an `X-CSRF-Token` header tied to the session and an allowed `Origin`.
 - List endpoints use cursor pagination: `{ "items": [], "nextCursor": null }`.
 - `requestId` is returned in every error and response header.
-- `Idempotency-Key` is required for invitation creation and may be introduced for other retry-prone mutations.
+- Retry-prone mutations may gain explicit idempotency keys when pending-email invitations or external delivery are introduced.
 
 Error envelope:
 
@@ -23,7 +23,7 @@ Error envelope:
 }
 ```
 
-Stable initial codes include `VALIDATION_ERROR`, `AUTHENTICATION_REQUIRED`, `INVALID_CREDENTIALS`, `CSRF_INVALID`, `FORBIDDEN`, `RESOURCE_NOT_FOUND`, `NAME_CONFLICT`, `REVISION_CONFLICT`, `INVITATION_INVALID`, `INVITATION_EXPIRED`, `RATE_LIMITED`, and `INTERNAL_ERROR`.
+Stable current codes include `VALIDATION_ERROR`, `AUTHENTICATION_REQUIRED`, `INVALID_CREDENTIALS`, `CSRF_INVALID`, `FORBIDDEN`, `RESOURCE_NOT_FOUND`, `NAME_CONFLICT`, `REVISION_CONFLICT`, `RATE_LIMITED`, and `INTERNAL_ERROR`. Invitation-specific codes are added with the pending-email invitation API.
 
 ## Authentication
 
@@ -93,8 +93,7 @@ Successful save returns `200` with document ID and new revision metadata. A stal
       "currentRevision": {
         "id": "rev_8",
         "ordinal": 8,
-        "createdAt": "2026-07-27T12:00:00.000Z",
-        "author": { "id": "user_a", "displayName": "Alice" }
+        "createdAt": "2026-07-27T12:00:00.000Z"
       }
     },
     "requestId": "req_opaque"
@@ -105,6 +104,8 @@ Successful save returns `200` with document ID and new revision metadata. A stal
 The conflict response omits content to keep response size and accidental exposure bounded. The authorized client may fetch the current document and present reload, copy-local-content, and compare workflows. A force-save flag is not provided in MVP.
 
 Restore requires the caller's current `baseRevisionId` as well as the historical path revision, preventing a restore from racing with a newer save.
+
+History lists at most 200 revisions newest-first in the current release. Each item includes revision ID, ordinal, timestamp, author ID/email, UTF-8 byte size, optional save message, and optional restore lineage. Historical content is returned only by the individual revision endpoint and only to owners/editors. A restore returns the same checkpoint response shape as collaborative Save, resets the Yjs room generation, and forces connected clients to rebuild from the new authoritative head.
 
 Collaboration ticket creation requires the authenticated session, CSRF token, and allowed origin. The response contains a random one-time token, WebSocket URL, document ID, current permission, and expiry. Tickets expire after one minute, are bound to one document and session, and are consumed atomically during WebSocket authentication. The raw ticket is never stored or logged.
 
@@ -118,9 +119,36 @@ Collaboration ticket creation requires the authenticated session, CSRF token, an
 | `PATCH`  | `/documents/:documentId/collaborators/:userId` | Owner changes role               |
 | `DELETE` | `/documents/:documentId/collaborators/:userId` | Owner revokes access             |
 
-Grant body: `{ "email": "collaborator@example.com", "role": "editor" }`. The target must already have an active MyMD account. Sharing does not return owner folder metadata. Grant, role-change, and revoke routes are owner-only, audited, and invalidate active collaboration-room connections so reconnects must pass current authorization.
+Grant body: `{ "email": "collaborator@example.com", "role": "editor" }`. The target must already have an active TeamMD account. Sharing does not return owner folder metadata. Grant, role-change, and revoke routes are owner-only, audited, and invalidate active collaboration-room connections so reconnects must pass current authorization.
 
 Tokenized pending-email invitations, acceptance/decline routes, and email delivery are planned extensions and are not part of the current API.
+
+## Public Read-Only Links
+
+| Method   | Path                                 | Purpose                                     |
+| -------- | ------------------------------------ | ------------------------------------------- |
+| `GET`    | `/documents/:documentId/public-link` | Owner reads enabled state and creation time |
+| `POST`   | `/documents/:documentId/public-link` | Owner creates or rotates the bearer link    |
+| `DELETE` | `/documents/:documentId/public-link` | Owner revokes the current bearer link       |
+| `POST`   | `/public/documents/resolve`          | Anonymous browser resolves one bearer token |
+
+Management routes require owner authorization; create/delete also require CSRF and an allowed origin. Creation returns the raw 43-character URL-safe token once with `createdAt`. Status never returns an existing raw token. Creating again rotates the token and immediately invalidates the previous value.
+
+The web client places the raw token in `/public#token=...`. URL fragments are not sent in HTTP requests or referrers. The public page reads the fragment, removes it from the address bar, and sends `{ "token": "..." }` to the fixed resolver endpoint. The resolver is rate-limited, sends `Cache-Control: private, no-store` and `Referrer-Policy: no-referrer`, and returns only:
+
+```json
+{
+  "name": "Published notes.md",
+  "content": "# Current saved Markdown\n",
+  "currentRevision": {
+    "id": "rev_12",
+    "ordinal": 12,
+    "createdAt": "2026-07-29T01:42:28.684Z"
+  }
+}
+```
+
+The response never includes unsaved collaborative state, history, owner identity, collaborators, or folder metadata. Invalid, revoked, trashed, or hidden-ancestor links all return the same `404 RESOURCE_NOT_FOUND` behavior.
 
 ## Trash And Health
 

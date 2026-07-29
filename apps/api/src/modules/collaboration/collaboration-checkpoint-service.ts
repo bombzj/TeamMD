@@ -1,7 +1,8 @@
 import type {
   CollaborationCheckpointResponse,
   CollaborativeCheckpointRequest,
-} from '@mymd/contracts';
+  RestoreRevisionRequest,
+} from '@teammd/contracts';
 import type { Hocuspocus } from '@hocuspocus/server';
 import { createHash } from 'node:crypto';
 import * as Y from 'yjs';
@@ -69,6 +70,68 @@ export class CollaborationCheckpointService {
             contentHash,
           }),
         );
+        return { ...result, contentHash };
+      });
+    } finally {
+      await directConnection.disconnect({ unloadImmediately: false });
+    }
+  }
+
+  public async restoreRevision(
+    userId: string,
+    documentId: string,
+    revisionId: string,
+    input: RestoreRevisionRequest,
+    requestId: string,
+  ): Promise<CollaborationCheckpointResponse> {
+    const source = await this.workspaceService.getRevision(
+      userId,
+      documentId,
+      revisionId,
+    );
+    const directConnection = await this.collaboration.openDirectConnection(
+      documentId,
+      {
+        userId,
+        sessionId: 'http-restore',
+        documentId,
+        permission: 'editor',
+        readOnly: false,
+      },
+    );
+    const room = directConnection.document;
+    if (room === null)
+      throw new Error('The collaboration room is unavailable.');
+
+    try {
+      return await room.saveMutex.runExclusive(async () => {
+        const result = await this.workspaceService.restoreRevision(
+          userId,
+          documentId,
+          revisionId,
+          input,
+          requestId,
+        );
+        const text = room.getText('content');
+        room.transact(() => {
+          text.delete(0, text.length);
+          if (source.content.length > 0) text.insert(0, source.content);
+        });
+        await this.collaborationService.storeState(
+          documentId,
+          Y.encodeStateAsUpdate(room),
+        );
+        const contentHash = createHash('sha256')
+          .update(source.content)
+          .digest('hex');
+        room.broadcastStateless(
+          JSON.stringify({
+            type: 'document-restored',
+            ...result.currentRevision,
+            contentHash,
+          }),
+        );
+        this.collaboration.closeConnections(documentId);
         return { ...result, contentHash };
       });
     } finally {

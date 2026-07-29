@@ -1,5 +1,5 @@
 import { Server } from '@hocuspocus/server';
-import type { ServerConfig } from '@mymd/config';
+import type { ServerConfig } from '@teammd/config';
 import * as Y from 'yjs';
 
 import type {

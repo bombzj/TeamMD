@@ -1,6 +1,6 @@
 # Development Guide
 
-The repository is under active implementation. Phase 0 adds the Prisma schema, lint configuration, and runnable apps incrementally.
+The repository contains runnable web, API, and collaboration services. Product and production-readiness work continues against the phased roadmap.
 
 ## Prerequisites
 
@@ -20,10 +20,10 @@ corepack prepare pnpm@10.13.1 --activate
 Use `.env.local` for workstation settings. It is ignored by Git. Start from `.env.example` on a new machine and set a complete Prisma MySQL URL:
 
 ```text
-DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/mymd
+DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/teammd
 ```
 
-URL-encode reserved characters in username/password. Do not use a production credential, commit the file, or print it in diagnostics. Use a non-root MySQL account with privileges limited to the local `mymd` schema.
+URL-encode reserved characters in username/password. Do not use a production credential, commit the file, or print it in diagnostics. Use a non-root MySQL account with privileges limited to the local `teammd` schema.
 
 `DATABASE_URL` is Prisma's connection source. The individual `MYSQL_*` fields are available to local tooling and must describe the same database.
 
@@ -31,8 +31,8 @@ URL-encode reserved characters in username/password. Do not use a production cre
 
 ```powershell
 pnpm install
-pnpm --filter @mymd/api prisma:generate
-pnpm --filter @mymd/api prisma:migrate
+pnpm --filter @teammd/api prisma:generate
+pnpm --filter @teammd/api prisma:migrate
 pnpm dev
 ```
 
@@ -40,16 +40,16 @@ Local endpoints are web `http://localhost:5173`, API `http://localhost:3000`, an
 
 ## Commands
 
-| Command                        | Purpose                                |
-| ------------------------------ | -------------------------------------- |
-| `pnpm dev`                     | Run workspace development processes    |
-| `pnpm build`                   | Build all packages in dependency order |
-| `pnpm typecheck`               | Typecheck all packages                 |
-| `pnpm lint`                    | Lint all packages                      |
-| `pnpm test`                    | Run package tests                      |
-| `pnpm format:check`            | Check formatting                       |
-| `pnpm --filter @mymd/api test` | Run API tests only                     |
-| `pnpm --filter @mymd/web test` | Run web tests only                     |
+| Command                          | Purpose                                |
+| -------------------------------- | -------------------------------------- |
+| `pnpm dev`                       | Run workspace development processes    |
+| `pnpm build`                     | Build all packages in dependency order |
+| `pnpm typecheck`                 | Typecheck all packages                 |
+| `pnpm lint`                      | Lint all packages                      |
+| `pnpm test`                      | Run package tests                      |
+| `pnpm format:check`              | Check formatting                       |
+| `pnpm --filter @teammd/api test` | Run API tests only                     |
+| `pnpm --filter @teammd/web test` | Run web tests only                     |
 
 Prefer the narrowest package command while iterating, followed by root checks for cross-cutting changes.
 

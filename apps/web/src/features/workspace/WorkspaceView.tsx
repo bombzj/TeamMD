@@ -2,7 +2,7 @@ import type {
   DocumentSummaryDto,
   FolderDto,
   WorkspaceTreeResponse,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,

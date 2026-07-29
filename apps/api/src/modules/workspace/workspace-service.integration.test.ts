@@ -97,7 +97,7 @@ describe('WorkspaceService with MySQL', () => {
     );
     const child = await workspaceService.createFolder(
       userId,
-      { name: 'MyMD', parentId: parent.id },
+      { name: 'TeamMD', parentId: parent.id },
       'workspace-create-child',
     );
     await workspaceService.createDocument(
@@ -176,6 +176,75 @@ describe('WorkspaceService with MySQL', () => {
       ordinal: 2,
       content: '# Vditor\n\nExplicit saves keep every draft.\n',
       saveMessage: 'Write introduction',
+    });
+  });
+
+  it('restores historical content as a new immutable revision', async () => {
+    const created = await workspaceService.createDocument(
+      userId,
+      { name: 'Recovery.md', folderId: null },
+      'workspace-recovery-create',
+    );
+    const second = await workspaceService.saveDocument(
+      userId,
+      created.id,
+      {
+        baseRevisionId: created.currentRevision.id,
+        content: '# Second revision\n',
+      },
+      'workspace-recovery-second',
+    );
+    const third = await workspaceService.saveDocument(
+      userId,
+      created.id,
+      {
+        baseRevisionId: second.currentRevision.id,
+        content: '# Third revision\n',
+      },
+      'workspace-recovery-third',
+    );
+
+    const restored = await workspaceService.restoreRevision(
+      userId,
+      created.id,
+      created.currentRevision.id,
+      {
+        baseRevisionId: third.currentRevision.id,
+        saveMessage: 'Recover the original draft',
+      },
+      'workspace-recovery-restore',
+    );
+
+    expect(restored.currentRevision.ordinal).toBe(4);
+    await expect(
+      workspaceService.restoreRevision(
+        userId,
+        created.id,
+        second.currentRevision.id,
+        { baseRevisionId: third.currentRevision.id },
+        'workspace-recovery-stale',
+      ),
+    ).rejects.toMatchObject({
+      code: 'REVISION_CONFLICT',
+      statusCode: 409,
+    });
+
+    const stored = await prisma.document.findUniqueOrThrow({
+      where: { id: created.id },
+      include: { revisions: { orderBy: { ordinal: 'asc' } } },
+    });
+    expect(stored.currentRevisionId).toBe(restored.currentRevision.id);
+    expect(stored.revisions).toHaveLength(4);
+    expect(stored.revisions[0]).toMatchObject({ ordinal: 1, content: '' });
+    expect(stored.revisions[2]).toMatchObject({
+      ordinal: 3,
+      content: '# Third revision\n',
+    });
+    expect(stored.revisions[3]).toMatchObject({
+      ordinal: 4,
+      content: '',
+      restoredFromRevisionId: created.currentRevision.id,
+      saveMessage: 'Recover the original draft',
     });
   });
 

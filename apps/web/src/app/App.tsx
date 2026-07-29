@@ -1,8 +1,9 @@
-import type { AuthResponse } from '@mymd/contracts';
+import type { AuthResponse } from '@teammd/contracts';
 import { Folder, LogOut, Plus, Search, Trash2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { AuthScreen } from '../features/auth/AuthScreen.js';
+import { PublicDocumentView } from '../features/public-document/PublicDocumentView.js';
 import { WorkspaceView } from '../features/workspace/WorkspaceView.js';
 import { loadCurrentUser, logout } from '../lib/api.js';
 
@@ -12,9 +13,11 @@ type AuthState =
   | { status: 'authenticated'; auth: AuthResponse };
 
 export function App() {
+  const [publicToken] = useState(readPublicToken);
   const [authState, setAuthState] = useState<AuthState>({ status: 'loading' });
 
   useEffect(() => {
+    if (publicToken !== null) return;
     let active = true;
     void loadCurrentUser()
       .then((auth) => {
@@ -30,12 +33,16 @@ export function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [publicToken]);
+
+  if (publicToken !== null) {
+    return <PublicDocumentView token={publicToken} />;
+  }
 
   if (authState.status === 'loading') {
     return (
-      <main className="loading-screen" aria-label="Loading MyMD">
-        <div className="wordmark">MyMD</div>
+      <main className="loading-screen" aria-label="Loading TeamMD">
+        <div className="wordmark">TeamMD</div>
         <div className="loading-rule" />
       </main>
     );
@@ -62,6 +69,14 @@ export function App() {
   );
 }
 
+function readPublicToken(): string | null {
+  if (window.location.pathname !== '/public') return null;
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
+  if (token === null) return '';
+  window.history.replaceState(null, '', '/public');
+  return token;
+}
+
 function WorkspaceShell({
   auth,
   onLogout,
@@ -75,7 +90,7 @@ function WorkspaceShell({
   return (
     <div className="workspace-shell">
       <header className="topbar">
-        <div className="wordmark">MyMD</div>
+        <div className="wordmark">TeamMD</div>
         <div className="topbar-actions">
           <button
             className="icon-button"

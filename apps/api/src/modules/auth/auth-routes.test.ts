@@ -2,8 +2,8 @@ import {
   authResponseSchema,
   errorResponseSchema,
   type SessionListResponse,
-} from '@mymd/contracts';
-import type { ServerConfig } from '@mymd/config';
+} from '@teammd/contracts';
+import type { ServerConfig } from '@teammd/config';
 import type { PrismaClient } from '@prisma/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -129,7 +129,7 @@ describe('authentication routes', () => {
       csrfToken: 'a'.repeat(43),
     });
     const cookies = String(response.headers['set-cookie']);
-    expect(cookies).toContain('mymd_session=session-token');
+    expect(cookies).toContain('teammd_session=session-token');
     expect(cookies).toContain('HttpOnly');
     expect(cookies).toContain('SameSite=Lax');
   });
@@ -137,7 +137,8 @@ describe('authentication routes', () => {
   it('requires both active session and matching CSRF for logout', async () => {
     const service = new FakeAuthService();
     const app = await createTestApp(service);
-    const cookie = 'mymd_session=session-token; mymd_csrf=' + 'a'.repeat(43);
+    const cookie =
+      'teammd_session=session-token; teammd_csrf=' + 'a'.repeat(43);
     const rejected = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/logout',

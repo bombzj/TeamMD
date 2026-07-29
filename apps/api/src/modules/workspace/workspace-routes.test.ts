@@ -6,12 +6,17 @@ import {
   documentSummarySchema,
   errorResponseSchema,
   folderSchema,
+  publicDocumentResponseSchema,
+  publicLinkCreateResponseSchema,
+  publicLinkStatusSchema,
+  revisionContentResponseSchema,
+  revisionListResponseSchema,
   saveDocumentResponseSchema,
   workspaceTreeResponseSchema,
   type DocumentSummaryDto,
   type FolderDto,
-} from '@mymd/contracts';
-import type { ServerConfig } from '@mymd/config';
+} from '@teammd/contracts';
+import type { ServerConfig } from '@teammd/config';
 import type { PrismaClient } from '@prisma/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,7 +63,7 @@ const document: DocumentSummaryDto = {
 const documentContent = {
   ...document,
   permission: 'owner' as const,
-  content: '# MyMD\n',
+  content: '# TeamMD\n',
 };
 const saveResponse = {
   documentId: document.id,
@@ -67,6 +72,13 @@ const saveResponse = {
     ordinal: 2,
     createdAt: '2026-07-27T12:05:00.000Z',
   },
+};
+const historyRevision = {
+  ...saveResponse.currentRevision,
+  author: { id: userId, email: 'person@example.com' },
+  byteSize: 7,
+  saveMessage: 'Clarify title',
+  restoredFromRevisionId: null,
 };
 
 class FakeAuthService {
@@ -107,6 +119,12 @@ class FakeWorkspaceService {
   public permanentlyDeleteFolder = vi.fn().mockResolvedValue(undefined);
   public createDocument = vi.fn().mockResolvedValue(document);
   public getDocument = vi.fn().mockResolvedValue(documentContent);
+  public listRevisions = vi
+    .fn()
+    .mockResolvedValue({ revisions: [historyRevision] });
+  public getRevision = vi
+    .fn()
+    .mockResolvedValue({ ...historyRevision, content: '# TeamMD\n' });
   public saveDocument = vi.fn().mockResolvedValue(saveResponse);
   public updateDocument = vi.fn().mockResolvedValue(document);
   public trashDocument = vi.fn().mockResolvedValue(undefined);
@@ -126,6 +144,11 @@ class FakeCollaborationService {
 
 class FakeCollaborationCheckpointService {
   public checkpoint = vi.fn().mockResolvedValue({
+    ...saveResponse,
+    contentHash:
+      '5a20c83155116d212e04cd1301b39da22c04944de6c80fb6f17c1db0a9b037fc',
+  });
+  public restoreRevision = vi.fn().mockResolvedValue({
     ...saveResponse,
     contentHash:
       '5a20c83155116d212e04cd1301b39da22c04944de6c80fb6f17c1db0a9b037fc',
@@ -150,6 +173,19 @@ class FakeSharingService {
   public grantAccess = vi.fn().mockResolvedValue(collaborator);
   public updateRole = vi.fn().mockResolvedValue(collaborator);
   public revokeAccess = vi.fn().mockResolvedValue(undefined);
+  public getPublicLinkStatus = vi
+    .fn()
+    .mockResolvedValue({ enabled: false, createdAt: null });
+  public createPublicLink = vi.fn().mockResolvedValue({
+    token: 'p'.repeat(43),
+    createdAt: '2026-07-27T12:00:00.000Z',
+  });
+  public revokePublicLink = vi.fn().mockResolvedValue(undefined);
+  public resolvePublicDocument = vi.fn().mockResolvedValue({
+    name: document.name,
+    content: documentContent.content,
+    currentRevision: document.currentRevision,
+  });
 }
 
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
@@ -278,7 +314,7 @@ describe('workspace routes', () => {
     });
     const saveBody = {
       baseRevisionId: document.currentRevision.id,
-      content: '# MyMD\n\nSaved with Vditor.\n',
+      content: '# TeamMD\n\nSaved with Vditor.\n',
     };
     const saveResponseResult = await app.inject({
       method: 'PUT',
@@ -371,6 +407,93 @@ describe('workspace routes', () => {
       document.id,
       {},
       expect.any(String),
+    );
+  });
+
+  it('lists, reads, and restores immutable revisions', async () => {
+    const service = new FakeWorkspaceService();
+    const checkpointService = new FakeCollaborationCheckpointService();
+    const app = await createTestApp(
+      service,
+      new FakeCollaborationService(),
+      checkpointService,
+    );
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/v1/documents/${document.id}/revisions`,
+      headers: authHeaders(false),
+    });
+    const read = await app.inject({
+      method: 'GET',
+      url: `/api/v1/documents/${document.id}/revisions/${historyRevision.id}`,
+      headers: authHeaders(false),
+    });
+    const restoreBody = { baseRevisionId: document.currentRevision.id };
+    const restored = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/revisions/${historyRevision.id}/restore`,
+      headers: authHeaders(),
+      payload: restoreBody,
+    });
+
+    expect(
+      revisionListResponseSchema.parse(list.json()).revisions,
+    ).toHaveLength(1);
+    expect(revisionContentResponseSchema.parse(read.json()).content).toBe(
+      '# TeamMD\n',
+    );
+    expect(restored.statusCode).toBe(200);
+    expect(checkpointService.restoreRevision).toHaveBeenCalledWith(
+      userId,
+      document.id,
+      historyRevision.id,
+      restoreBody,
+      expect.any(String),
+    );
+  });
+
+  it('manages public links as owner mutations and resolves them without a session', async () => {
+    const sharingService = new FakeSharingService();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      new FakeCollaborationService(),
+      new FakeCollaborationCheckpointService(),
+      sharingService,
+    );
+    const status = await app.inject({
+      method: 'GET',
+      url: `/api/v1/documents/${document.id}/public-link`,
+      headers: authHeaders(false),
+    });
+    const created = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/public-link`,
+      headers: authHeaders(),
+    });
+    const resolved = await app.inject({
+      method: 'POST',
+      url: '/api/v1/public/documents/resolve',
+      payload: { token: 'p'.repeat(43) },
+    });
+    const revoked = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/documents/${document.id}/public-link`,
+      headers: authHeaders(),
+    });
+
+    expect(publicLinkStatusSchema.parse(status.json())).toEqual({
+      enabled: false,
+      createdAt: null,
+    });
+    expect(
+      publicLinkCreateResponseSchema.parse(created.json()).token,
+    ).toHaveLength(43);
+    expect(publicDocumentResponseSchema.parse(resolved.json()).content).toBe(
+      '# TeamMD\n',
+    );
+    expect(revoked.statusCode).toBe(204);
+    expect(sharingService.resolvePublicDocument).toHaveBeenCalledWith(
+      'p'.repeat(43),
     );
   });
 
@@ -480,7 +603,7 @@ async function createTestApp(
 function authHeaders(withCsrf = true) {
   return {
     origin: config.webOrigin,
-    cookie: `mymd_session=session-token; mymd_csrf=${'a'.repeat(43)}`,
+    cookie: `teammd_session=session-token; teammd_csrf=${'a'.repeat(43)}`,
     ...(withCsrf ? { 'x-csrf-token': 'a'.repeat(43) } : {}),
   };
 }

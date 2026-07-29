@@ -2,7 +2,7 @@ import {
   HocuspocusProvider,
   HocuspocusProviderWebsocket,
 } from '@hocuspocus/provider';
-import type { ServerConfig } from '@mymd/config';
+import type { ServerConfig } from '@teammd/config';
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import * as Y from 'yjs';

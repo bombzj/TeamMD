@@ -2,7 +2,7 @@ import type {
   AuthResponse,
   SessionListResponse,
   UserDto,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import { Prisma, type PrismaClient, type User } from '@prisma/client';
 import argon2 from 'argon2';
 

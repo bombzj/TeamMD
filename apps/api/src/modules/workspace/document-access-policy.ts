@@ -1,4 +1,4 @@
-import type { DocumentContentResponse } from '@mymd/contracts';
+import type { DocumentContentResponse } from '@teammd/contracts';
 import { Prisma, type Document, type Folder } from '@prisma/client';
 
 import { ApiError } from '../../lib/api-error.js';

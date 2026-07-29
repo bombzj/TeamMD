@@ -10,6 +10,13 @@ import {
   documentSummarySchema,
   folderSchema,
   permanentDeleteRequestSchema,
+  publicDocumentRequestSchema,
+  publicDocumentResponseSchema,
+  publicLinkCreateResponseSchema,
+  publicLinkStatusSchema,
+  restoreRevisionRequestSchema,
+  revisionContentResponseSchema,
+  revisionListResponseSchema,
   saveDocumentRequestSchema,
   saveDocumentResponseSchema,
   shareDocumentRequestSchema,
@@ -19,7 +26,7 @@ import {
   updateFolderRequestSchema,
   updateCollaboratorRequestSchema,
   workspaceTreeResponseSchema,
-} from '@mymd/contracts';
+} from '@teammd/contracts';
 import type { FastifyInstance } from 'fastify';
 
 import { ApiError } from '../../lib/api-error.js';
@@ -62,6 +69,21 @@ export function registerWorkspaceRoutes(
       .header('Cache-Control', 'no-store')
       .send(sharedDocumentListResponseSchema.parse(result));
   });
+
+  app.post(
+    '/public/documents/resolve',
+    publicReadRateLimit(),
+    async (request, reply) => {
+      const body = publicDocumentRequestSchema.parse(request.body);
+      const result = await options.sharingService.resolvePublicDocument(
+        body.token,
+      );
+      return reply
+        .header('Cache-Control', 'private, no-store')
+        .header('Referrer-Policy', 'no-referrer')
+        .send(publicDocumentResponseSchema.parse(result));
+    },
+  );
 
   app.get<{ Params: { documentId: string } }>(
     '/documents/:documentId/collaborators',
@@ -129,6 +151,51 @@ export function registerWorkspaceRoutes(
         request.id,
       );
       options.closeCollaborationConnections(request.params.documentId);
+      return reply.status(204).send();
+    },
+  );
+
+  app.get<{ Params: { documentId: string } }>(
+    '/documents/:documentId/public-link',
+    async (request, reply) => {
+      const session = requireSession(request);
+      const result = await options.sharingService.getPublicLinkStatus(
+        session.user.id,
+        request.params.documentId,
+      );
+      return reply
+        .header('Cache-Control', 'no-store')
+        .send(publicLinkStatusSchema.parse(result));
+    },
+  );
+
+  app.post<{ Params: { documentId: string } }>(
+    '/documents/:documentId/public-link',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      const result = await options.sharingService.createPublicLink(
+        session.user.id,
+        request.params.documentId,
+        request.id,
+      );
+      return reply
+        .header('Cache-Control', 'no-store')
+        .status(201)
+        .send(publicLinkCreateResponseSchema.parse(result));
+    },
+  );
+
+  app.delete<{ Params: { documentId: string } }>(
+    '/documents/:documentId/public-link',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      await options.sharingService.revokePublicLink(
+        session.user.id,
+        request.params.documentId,
+        request.id,
+      );
       return reply.status(204).send();
     },
   );
@@ -278,6 +345,60 @@ export function registerWorkspaceRoutes(
     },
   );
 
+  app.get<{ Params: { documentId: string } }>(
+    '/documents/:documentId/revisions',
+    async (request, reply) => {
+      const session = requireSession(request);
+      const result = await options.workspaceService.listRevisions(
+        session.user.id,
+        request.params.documentId,
+      );
+      return reply
+        .header('Cache-Control', 'no-store')
+        .send(revisionListResponseSchema.parse(result));
+    },
+  );
+
+  app.get<{ Params: { documentId: string; revisionId: string } }>(
+    '/documents/:documentId/revisions/:revisionId',
+    async (request, reply) => {
+      const session = requireSession(request);
+      const result = await options.workspaceService.getRevision(
+        session.user.id,
+        request.params.documentId,
+        request.params.revisionId,
+      );
+      return reply
+        .header('Cache-Control', 'no-store')
+        .send(revisionContentResponseSchema.parse(result));
+    },
+  );
+
+  app.post<{ Params: { documentId: string; revisionId: string } }>(
+    '/documents/:documentId/revisions/:revisionId/restore',
+    mutationRateLimit(),
+    async (request, reply) => {
+      const session = requireMutationSession(request, options);
+      if (options.collaborationCheckpointService === undefined) {
+        throw new ApiError(
+          503,
+          'INTERNAL_ERROR',
+          'Collaboration is temporarily unavailable.',
+        );
+      }
+      const body = restoreRevisionRequestSchema.parse(request.body);
+      const result =
+        await options.collaborationCheckpointService.restoreRevision(
+          session.user.id,
+          request.params.documentId,
+          request.params.revisionId,
+          body,
+          request.id,
+        );
+      return reply.send(collaborationCheckpointResponseSchema.parse(result));
+    },
+  );
+
   app.put<{ Params: { documentId: string } }>(
     '/documents/:documentId/content',
     saveRateLimit(),
@@ -367,6 +488,13 @@ function mutationRateLimit() {
 
 function permanentDeleteRateLimit() {
   return { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
+}
+
+function publicReadRateLimit() {
+  return {
+    bodyLimit: 1_024,
+    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+  };
 }
 
 function saveRateLimit() {
