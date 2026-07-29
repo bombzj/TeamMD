@@ -9,6 +9,7 @@ import type {
   CollaborationContext,
   CollaborationService,
 } from './collaboration-service.js';
+import { getMilkdownCodec } from './milkdown-codec.js';
 
 const documentId = 'cm1234567890documentabcde';
 const userId = 'cm1234567890userabcdefgh';
@@ -49,6 +50,7 @@ describe('CollaborationCheckpointService', () => {
     const service = new CollaborationCheckpointService(
       collaboration,
       {
+        getStateFormat: vi.fn().mockResolvedValue('legacy-text-v1'),
         storeState,
         getCheckpointRevisionId,
       } as unknown as CollaborationService,
@@ -113,7 +115,10 @@ describe('CollaborationCheckpointService', () => {
     });
     const service = new CollaborationCheckpointService(
       collaboration,
-      { storeState } as unknown as CollaborationService,
+      {
+        getStateFormat: vi.fn().mockResolvedValue('legacy-text-v1'),
+        storeState,
+      } as unknown as CollaborationService,
       {
         getRevision: vi.fn().mockResolvedValue({ content: historicalContent }),
         restoreRevision,
@@ -155,6 +160,103 @@ describe('CollaborationCheckpointService', () => {
     expect(closeConnections).toHaveBeenCalledWith(documentId);
 
     await roomConnection.disconnect();
+    initialDocument.destroy();
+  });
+
+  it('checkpoints and restores Milkdown structured state as canonical Markdown', async () => {
+    const codec = await getMilkdownCodec();
+    const initialDocument = new Y.Doc();
+    Y.applyUpdate(initialDocument, codec.createState(roomContent));
+    const storeState = vi.fn().mockResolvedValue(undefined);
+    const saveDocument = vi.fn().mockResolvedValue({
+      documentId,
+      currentRevision: savedRevision,
+    });
+    const restoredContent = '# Restored structured room\n';
+    const collaboration = new Hocuspocus<CollaborationContext>({
+      onLoadDocument() {
+        return Promise.resolve(Y.encodeStateAsUpdate(initialDocument));
+      },
+    });
+    const roomConnection = await collaboration.openDirectConnection(documentId);
+    const room = roomConnection.document;
+    if (room === null) throw new Error('Test room did not load.');
+    const service = new CollaborationCheckpointService(
+      collaboration,
+      {
+        getStateFormat: vi.fn().mockResolvedValue('milkdown-xml-v1'),
+        storeState,
+        getCheckpointRevisionId: vi.fn().mockResolvedValue(baseRevisionId),
+      } as unknown as CollaborationService,
+      {
+        saveDocument,
+        getRevision: vi.fn().mockResolvedValue({ content: restoredContent }),
+        restoreRevision: vi.fn().mockResolvedValue({
+          documentId,
+          currentRevision: savedRevision,
+        }),
+      } as unknown as WorkspaceService,
+    );
+
+    await service.checkpoint(userId, documentId, {}, 'request-structured');
+    expect(saveDocument).toHaveBeenCalledWith(
+      userId,
+      documentId,
+      { baseRevisionId, content: roomContent },
+      'request-structured',
+      true,
+    );
+
+    await service.restoreRevision(
+      userId,
+      documentId,
+      baseRevisionId,
+      { baseRevisionId: savedRevision.id },
+      'request-structured-restore',
+    );
+    expect(codec.read(room)).toBe(restoredContent);
+    expect(room.getText('content').length).toBe(0);
+
+    await roomConnection.disconnect();
+    initialDocument.destroy();
+  });
+
+  it('converts the complete live legacy draft before admitting Milkdown clients', async () => {
+    const initialDocument = new Y.Doc();
+    initialDocument.getText('content').insert(0, roomContent);
+    let convertedState: Uint8Array | undefined;
+    const collaboration = new Hocuspocus<CollaborationContext>({
+      onLoadDocument() {
+        return Promise.resolve(Y.encodeStateAsUpdate(initialDocument));
+      },
+    });
+    const closeConnections = vi.spyOn(collaboration, 'closeConnections');
+    const getDocument = vi.fn().mockResolvedValue({ permission: 'owner' });
+    const service = new CollaborationCheckpointService(
+      collaboration,
+      {
+        getStateFormat: vi.fn().mockResolvedValue('legacy-text-v1'),
+        convertLegacyState: vi.fn((_documentId, state: Uint8Array) => {
+          convertedState = state;
+          return Promise.resolve(true);
+        }),
+      } as unknown as CollaborationService,
+      { getDocument } as unknown as WorkspaceService,
+    );
+
+    await service.migrateToMilkdown(userId, documentId);
+
+    expect(getDocument).toHaveBeenCalledWith(userId, documentId);
+    expect(closeConnections).toHaveBeenCalledWith(documentId);
+    expect(convertedState).toBeDefined();
+    const convertedDocument = new Y.Doc();
+    Y.applyUpdate(convertedDocument, convertedState!);
+    expect((await getMilkdownCodec()).read(convertedDocument)).toBe(
+      roomContent,
+    );
+    expect(convertedDocument.getText('content').length).toBe(0);
+
+    convertedDocument.destroy();
     initialDocument.destroy();
   });
 });

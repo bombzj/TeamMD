@@ -107,7 +107,7 @@ Restore requires the caller's current `baseRevisionId` as well as the historical
 
 History lists at most 200 revisions newest-first in the current release. Each item includes revision ID, ordinal, timestamp, author ID/email, UTF-8 byte size, optional save message, and optional restore lineage. Historical content is returned only by the individual revision endpoint and only to owners/editors. A restore returns the same checkpoint response shape as collaborative Save, resets the Yjs room generation, and forces connected clients to rebuild from the new authoritative head.
 
-Collaboration ticket creation requires the authenticated session, CSRF token, and allowed origin. The response contains a random one-time token, WebSocket URL, document ID, current permission, and expiry. Tickets expire after one minute, are bound to one document and session, and are consumed atomically during WebSocket authentication. The raw ticket is never stored or logged.
+Collaboration ticket creation requires the authenticated session, CSRF token, allowed origin, and an editor protocol identifier. During migration, supported protocols are `legacy-text-v1` and `milkdown-xml-v1`. The response contains a random one-time token, WebSocket URL, document ID, current permission, negotiated state format, and expiry. Tickets expire after one minute, are bound to one document, session, and negotiated format, and are consumed atomically during WebSocket authentication. A client incompatible with the room format receives a stable upgrade-required error and is never allowed to create a second writable Yjs root. The raw ticket is never stored or logged.
 
 ## Sharing Registered Accounts
 

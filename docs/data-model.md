@@ -103,6 +103,7 @@ Constraints prohibit access rows for the owner. Deleting or trashing a document 
 | ---------------------- | ------------------------------------------------------------------- |
 | `documentId`           | One operational state per document                                  |
 | `generation`           | Incremented when restore replaces the authoritative room generation |
+| `stateFormat`          | Versioned representation: `LEGACY_TEXT_V1` or `MILKDOWN_XML_V1`     |
 | `yjsState`             | Compacted Yjs update; durable operational state, not history        |
 | `checkpointRevisionId` | Immutable revision represented by the latest explicit Save          |
 | `updatedAt`            | Last operational-state persistence time                             |
@@ -155,7 +156,7 @@ A unique `(documentId, ordinal)` constraint is the final guard against duplicate
 
 1. Authenticate and CSRF-check the HTTP checkpoint request.
 2. Open the active Hocuspocus room and serialize against room persistence.
-3. Read the exact authoritative `Y.Text('content')` snapshot and compacted Yjs state.
+3. Serialize the exact authoritative versioned Yjs document to canonical Markdown and compacted Yjs state.
 4. Revalidate owner/editor access inside the row-locked revision transaction.
 5. Insert the immutable revision, advance `Document.currentRevisionId`, and advance `CollaborationState.checkpointRevisionId` atomically.
 6. Broadcast validated revision metadata and the saved content hash to room clients.
@@ -171,6 +172,10 @@ WebSocket synchronization and operational-state persistence do not mean Saved. O
 5. Replace the active room text, persist that exact Yjs state, emit a restore control event, and disconnect clients so each creates a fresh local `Y.Doc` for the new generation.
 
 Existing revisions are never updated. A stale local CRDT document is never merged into a restored generation.
+
+## Live-State Format Migration
+
+Existing rows default to `LEGACY_TEXT_V1`. A conversion acquires the document/room serialization boundary, extracts the full legacy shared draft, verifies that the configured Milkdown schema can parse and semantically round-trip it, creates a fresh `MILKDOWN_XML_V1` document, increments `generation`, and persists format plus state atomically. A lossy document is not converted automatically. Immutable `DocumentRevision.content` rows are never changed by this operation.
 
 ## Deletion And Retention
 

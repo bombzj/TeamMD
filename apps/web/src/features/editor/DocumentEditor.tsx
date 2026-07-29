@@ -12,7 +12,6 @@ import {
   Cloud,
   CloudOff,
   Copy,
-  Eye,
   History,
   Link,
   MessageSquarePlus,
@@ -55,7 +54,6 @@ type DocumentEditorProps = {
 export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const queryClient = useQueryClient();
   const editorHostRef = useRef<HTMLDivElement | null>(null);
-  const previewHostRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<CollaborativeEditor | null>(null);
   const restoringEditorRef = useRef(false);
   const savedContentRef = useRef('');
@@ -155,10 +153,10 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   useEffect(() => {
     const initial = initialDocumentRef.current;
     const editorHost = editorHostRef.current;
-    const previewHost = previewHostRef.current;
-    if (initial === null || editorHost === null || previewHost === null) return;
+    if (initial === null || editorHost === null) return;
     let active = true;
     let editor: CollaborativeEditor | null = null;
+    let receivedAuthoritativeContent = false;
 
     savedContentRef.current = initial.content;
     setContent(initial.content);
@@ -172,9 +170,6 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     void createCollaborativeEditor({
       documentId,
       editorHost,
-      previewHost,
-      readOnly: initial.permission === 'viewer',
-      initialContent: initial.content,
       createTicket: () => createCollaborationTicket(documentId),
       onCheckpoint: applyCheckpoint,
       onRestore: () => {
@@ -197,7 +192,8 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
       onContentChange: (nextContent) => {
         if (!active) return;
         setContent(nextContent);
-        if (restoringEditorRef.current) {
+        if (!receivedAuthoritativeContent || restoringEditorRef.current) {
+          receivedAuthoritativeContent = true;
           restoringEditorRef.current = false;
           savedContentRef.current = nextContent;
           setDirty(false);
@@ -388,18 +384,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         className="editor-canvas"
         aria-label="Collaborative Markdown editor"
       >
-        <div className="editor-pane">
-          <div className="pane-heading">
-            <Users size={15} /> Editor
-          </div>
-          <div ref={editorHostRef} className="codemirror-host" />
-        </div>
-        <div className="preview-pane">
-          <div className="pane-heading">
-            <Eye size={15} /> Preview
-          </div>
-          <div ref={previewHostRef} className="vditor-preview vditor-reset" />
-        </div>
+        <div ref={editorHostRef} className="milkdown-host" />
       </section>
       <footer className="editor-footer">
         <span>Revision {revisionOrdinal}</span>

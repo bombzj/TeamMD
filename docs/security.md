@@ -53,6 +53,8 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Set `X-Content-Type-Options: nosniff`, an appropriate `Referrer-Policy`, frame restrictions, and `Permissions-Policy`.
 - Avoid rendering collaborator names, filenames, or error details as HTML.
 - Pin and audit Vditor behavior when upgrading; add sanitization regression fixtures.
+- Treat Milkdown/ProseMirror document content, links, images, code, and plugin attributes as untrusted. Disable raw HTML and unsafe URL schemes in the writable schema, and never persist rendered HTML as a revision.
+- Serialize collaborative checkpoints to Markdown on the trusted server using the same pinned schema version as the client. Reject malformed or unsupported structured state rather than accepting client-supplied Markdown projections.
 
 ## Input And Abuse Limits
 

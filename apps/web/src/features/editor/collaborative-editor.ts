@@ -1,16 +1,5 @@
-import { defaultKeymap, indentWithTab } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
-import { Compartment, EditorState } from '@codemirror/state';
-import {
-  drawSelection,
-  dropCursor,
-  EditorView,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  highlightSpecialChars,
-  keymap,
-  lineNumbers,
-} from '@codemirror/view';
+import { Crepe } from '@milkdown/crepe';
+import { collab, collabServiceCtx } from '@milkdown/plugin-collab';
 import {
   collaborationCheckpointEventSchema,
   collaborationRestoreEventSchema,
@@ -18,8 +7,6 @@ import {
   type CollaborationTicketResponse,
 } from '@teammd/contracts';
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider';
-import Vditor from 'vditor';
-import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
 import * as Y from 'yjs';
 
 export type CollaborationTransport = `${WebSocketStatus}` | 'synced';
@@ -27,9 +14,6 @@ export type CollaborationTransport = `${WebSocketStatus}` | 'synced';
 type CollaborativeEditorOptions = {
   documentId: string;
   editorHost: HTMLElement;
-  previewHost: HTMLDivElement;
-  readOnly: boolean;
-  initialContent: string;
   createTicket: () => Promise<CollaborationTicketResponse>;
   onCheckpoint: (checkpoint: CollaborationCheckpointEvent) => void;
   onRestore: () => void;
@@ -52,14 +36,36 @@ export async function createCollaborativeEditor(
   options: CollaborativeEditorOptions,
 ): Promise<CollaborativeEditor> {
   const initialTicket = await options.createTicket();
+  if (initialTicket.stateFormat !== 'milkdown-xml-v1') {
+    throw new Error('The collaboration room requires an unsupported editor.');
+  }
   let readOnly = initialTicket.permission === 'viewer';
   let nextTicket: CollaborationTicketResponse | null = initialTicket;
-  let previewTimer: ReturnType<typeof setTimeout> | undefined;
+  let crepe: Crepe | null = null;
+  let currentContent = '';
+  let contentTimer: number | undefined;
   let destroyed = false;
   const yDocument = new Y.Doc();
-  const yText = yDocument.getText('content');
-  const editing = new Compartment();
-  let view: EditorView | null = null;
+  const xmlFragment = yDocument.getXmlFragment('milkdown');
+  const publishContent = (content: string) => {
+    if (content === currentContent) return;
+    currentContent = content;
+    options.onContentChange(content);
+  };
+  const handleXmlChange = () => {
+    window.clearTimeout(contentTimer);
+    contentTimer = window.setTimeout(() => {
+      if (destroyed || crepe === null) return;
+      publishContent(crepe.getMarkdown());
+    }, 0);
+  };
+  xmlFragment.observeDeep(handleXmlChange);
+  const initialSync = deferred<void>();
+  const syncTimeout = window.setTimeout(() => {
+    initialSync.reject(
+      new Error('The collaboration room did not synchronize in time.'),
+    );
+  }, 10_000);
   const provider = new HocuspocusProvider({
     url: initialTicket.websocketUrl,
     name: options.documentId,
@@ -67,32 +73,31 @@ export async function createCollaborativeEditor(
     token: async () => {
       const ticket = nextTicket ?? (await options.createTicket());
       nextTicket = null;
+      if (ticket.stateFormat !== 'milkdown-xml-v1') {
+        throw new Error('The collaboration room changed editor format.');
+      }
       readOnly = ticket.permission === 'viewer';
       options.onPermissionChange(ticket.permission);
-      view?.dispatch({
-        effects: editing.reconfigure(editingExtensions(true)),
-      });
+      crepe?.setReadonly(true);
       return ticket.ticket;
     },
     flushDelay: 100,
     onStatus: ({ status }) => {
       options.onTransportChange(status);
-      if (status !== WebSocketStatus.Connected && view !== null) {
-        view.dispatch({
-          effects: editing.reconfigure(editingExtensions(true)),
-        });
-      }
+      if (status !== WebSocketStatus.Connected) crepe?.setReadonly(true);
     },
     onSynced: ({ state }) => {
       if (!state) return;
-      view?.dispatch({
-        effects: editing.reconfigure(editingExtensions(readOnly)),
-      });
+      initialSync.resolve();
+      crepe?.setReadonly(readOnly);
       options.onTransportChange('synced');
-      options.onContentChange(yText.toJSON());
     },
     onAuthenticationFailed: ({ reason }) => {
-      options.onError(reason || 'The collaboration connection was rejected.');
+      const error = new Error(
+        reason || 'The collaboration connection was rejected.',
+      );
+      initialSync.reject(error);
+      options.onError(error.message);
     },
     onAwarenessChange: ({ states }) => {
       options.onPresenceChange(states.length);
@@ -115,50 +120,52 @@ export async function createCollaborativeEditor(
   provider.setAwarenessField('user', collaborationIdentity());
   options.onPresenceChange(provider.awareness?.getStates().size ?? 1);
 
-  const undoManager = new Y.UndoManager(yText);
-  const state = EditorState.create({
-    doc: yText.toJSON(),
-    extensions: [
-      lineNumbers(),
-      highlightActiveLineGutter(),
-      highlightSpecialChars(),
-      drawSelection(),
-      dropCursor(),
-      highlightActiveLine(),
-      markdown(),
-      keymap.of([...defaultKeymap, ...yUndoManagerKeymap, indentWithTab]),
-      EditorView.lineWrapping,
-      editing.of(editingExtensions(true)),
-      yCollab(yText, provider.awareness, { undoManager }),
-      EditorView.theme({
-        '&': { height: '100%' },
-        '.cm-scroller': { overflow: 'auto' },
-      }),
-    ],
-  });
-  view = new EditorView({ state, parent: options.editorHost });
+  try {
+    await initialSync.promise;
+    window.clearTimeout(syncTimeout);
+    if (destroyed) throw new Error('The editor was closed before it loaded.');
 
-  const renderPreview = (content: string) => {
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(() => {
-      if (destroyed) return;
-      void Vditor.preview(options.previewHost, content, {
-        cdn: '/vditor',
-        mode: 'light',
-        markdown: { sanitize: true },
+    const renderedEditor = new Crepe({
+      root: options.editorHost,
+      features: {
+        [Crepe.Feature.AI]: false,
+        [Crepe.Feature.ImageBlock]: false,
+        [Crepe.Feature.Latex]: false,
+        [Crepe.Feature.TopBar]: true,
+      },
+    });
+    renderedEditor.setReadonly(readOnly);
+    renderedEditor.on((listener) => {
+      listener.markdownUpdated((_context, markdown) => {
+        publishContent(markdown);
       });
-    }, 180);
-  };
-  const contentChanged = () => {
-    const content = yText.toJSON();
-    options.onContentChange(content);
-    renderPreview(content);
-  };
-  yText.observe(contentChanged);
-  renderPreview(options.initialContent);
+    });
+    renderedEditor.editor.use(collab);
+    await renderedEditor.create();
+    crepe = renderedEditor;
+    renderedEditor.editor.action((context) => {
+      const awareness = provider.awareness;
+      if (awareness === null) {
+        throw new Error('Collaboration awareness is unavailable.');
+      }
+      context
+        .get(collabServiceCtx)
+        .bindXmlFragment(xmlFragment)
+        .setAwareness(awareness)
+        .connect();
+    });
+    renderedEditor.setReadonly(readOnly);
+    publishContent(renderedEditor.getMarkdown());
+    options.onTransportChange('synced');
+  } catch (error) {
+    window.clearTimeout(syncTimeout);
+    provider.destroy();
+    yDocument.destroy();
+    throw error;
+  }
 
   return {
-    getContent: () => yText.toJSON(),
+    getContent: () => currentContent,
     prepareCheckpoint: async () => {
       if (readOnly) {
         throw new Error('You no longer have permission to save this document.');
@@ -189,18 +196,25 @@ export async function createCollaborativeEditor(
     },
     destroy: () => {
       destroyed = true;
-      clearTimeout(previewTimer);
-      yText.unobserve(contentChanged);
-      view?.destroy();
-      view = null;
+      window.clearTimeout(syncTimeout);
+      window.clearTimeout(contentTimer);
+      xmlFragment.unobserveDeep(handleXmlChange);
       provider.destroy();
+      if (crepe !== null) void crepe.destroy();
+      crepe = null;
       yDocument.destroy();
     },
   };
 }
 
-function editingExtensions(readOnly: boolean) {
-  return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)];
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
 }
 
 function collaborationIdentity() {

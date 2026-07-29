@@ -25,6 +25,7 @@ import { createHash } from 'node:crypto';
 import * as Y from 'yjs';
 
 import { ApiError } from '../../lib/api-error.js';
+import { getMilkdownCodec } from '../collaboration/milkdown-codec.js';
 import { requireDocumentAccess } from './document-access-policy.js';
 
 const rootParentKey = '__root__';
@@ -575,14 +576,19 @@ export class WorkspaceService {
       const collaborationState =
         await transaction.collaborationState.findUnique({
           where: { documentId },
-          select: { documentId: true },
+          select: { documentId: true, stateFormat: true },
         });
       if (collaborationState !== null) {
         await transaction.collaborationState.update({
           where: { documentId },
           data: {
             generation: { increment: 1 },
-            yjsState: Buffer.from(encodeMarkdownState(sourceRevision.content)),
+            yjsState: Buffer.from(
+              await encodeMarkdownState(
+                sourceRevision.content,
+                collaborationState.stateFormat,
+              ),
+            ),
             checkpointRevisionId: revision.id,
           },
         });
@@ -956,7 +962,13 @@ function integrityError(): ApiError {
   );
 }
 
-function encodeMarkdownState(content: string): Uint8Array {
+async function encodeMarkdownState(
+  content: string,
+  stateFormat: 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1',
+): Promise<Uint8Array> {
+  if (stateFormat === 'MILKDOWN_XML_V1') {
+    return (await getMilkdownCodec()).createState(content);
+  }
   const document = new Y.Doc();
   try {
     if (content.length > 0) document.getText('content').insert(0, content);

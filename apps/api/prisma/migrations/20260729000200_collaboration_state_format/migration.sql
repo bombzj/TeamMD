@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE `CollaborationTicket`
+    ADD COLUMN `stateFormat` ENUM('LEGACY_TEXT_V1', 'MILKDOWN_XML_V1') NOT NULL DEFAULT 'LEGACY_TEXT_V1';
+
+-- AlterTable
+ALTER TABLE `CollaborationState`
+    ADD COLUMN `stateFormat` ENUM('LEGACY_TEXT_V1', 'MILKDOWN_XML_V1') NOT NULL DEFAULT 'LEGACY_TEXT_V1';

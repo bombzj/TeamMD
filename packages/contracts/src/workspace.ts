@@ -148,11 +148,26 @@ export const saveDocumentResponseSchema = z
   })
   .strict();
 
+export const collaborationEditorProtocolSchema = z.enum([
+  'legacy-text-v1',
+  'milkdown-xml-v1',
+]);
+
+export const collaborationStateFormatSchema = z.enum([
+  'legacy-text-v1',
+  'milkdown-xml-v1',
+]);
+
+export const collaborationTicketRequestSchema = z
+  .object({ editorProtocol: collaborationEditorProtocolSchema })
+  .strict();
+
 export const collaborationTicketResponseSchema = z
   .object({
     ticket: z.string().min(40).max(200),
     documentId: resourceIdSchema,
     permission: z.enum(['owner', 'editor', 'viewer']),
+    stateFormat: collaborationStateFormatSchema,
     websocketUrl: z.string().url(),
     expiresAt: z.iso.datetime({ offset: true }),
   })
@@ -278,6 +293,15 @@ export type RevisionContentResponse = z.infer<
 >;
 export type RestoreRevisionRequest = z.infer<
   typeof restoreRevisionRequestSchema
+>;
+export type CollaborationEditorProtocol = z.infer<
+  typeof collaborationEditorProtocolSchema
+>;
+export type CollaborationStateFormat = z.infer<
+  typeof collaborationStateFormatSchema
+>;
+export type CollaborationTicketRequest = z.infer<
+  typeof collaborationTicketRequestSchema
 >;
 export type CollaborationTicketResponse = z.infer<
   typeof collaborationTicketResponseSchema

@@ -4,7 +4,7 @@ This file is the authoritative engineering guide for humans and coding agents wo
 
 ## Mission
 
-Build a secure, reliable online Markdown workspace with live Yjs collaboration, explicit immutable checkpoints, file sharing, and recoverable revision history. CodeMirror is the writable collaborative surface; Vditor renders sanitized preview.
+Build a secure, reliable online Markdown workspace with live Yjs collaboration, explicit immutable checkpoints, file sharing, and recoverable revision history. The target writable surface is Milkdown bound natively to Yjs for rendered-in-place Markdown editing. Vditor remains a sanitized static renderer for history and public views during the migration.
 
 ## Read Before Changing Code
 
@@ -47,7 +47,9 @@ Dependency direction is one way:
 7. Document roles are `owner`, `editor`, and `viewer`. Exactly one owner exists in MVP. Ownership transfer is out of scope.
 8. Current sharing directly grants document access to an existing registered account by normalized email. Future pending-email invitations must be document-scoped, expiring, and single-use.
 9. Database changes use reviewed Prisma migrations. Never use schema push in shared environments.
-10. Yjs operational state uses the authenticated collaboration protocol and separate persistence. Collaborative Save reads the authoritative room and creates an immutable revision; clients never submit whole-document content for a collaborative checkpoint.
+10. Yjs operational state uses the authenticated collaboration protocol and separate persistence. Collaborative Save serializes the authoritative room to canonical Markdown and creates an immutable revision; clients never submit whole-document content for a collaborative checkpoint.
+11. Live-state formats are versioned. A legacy `Y.Text` room may be converted to the Milkdown `Y.XmlFragment` format only under the room-generation boundary, preserving the complete shared draft and rejecting incompatible clients.
+12. Rich-editor parsing and serialization must not silently discard supported Markdown. Conversion requires a round-trip fidelity check, and existing immutable revisions are never rewritten during editor migration.
 
 ## Engineering Workflow
 

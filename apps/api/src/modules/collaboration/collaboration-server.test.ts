@@ -12,6 +12,7 @@ import type {
   CollaborationContext,
   CollaborationService,
 } from './collaboration-service.js';
+import { getMilkdownCodec } from './milkdown-codec.js';
 
 const roomName = 'cm1234567890documentabcde';
 const webOrigin = 'http://localhost:5173';
@@ -41,6 +42,7 @@ class OriginWebSocket extends WebSocket {
 
 class InMemoryCollaborationService {
   public state = emptyState();
+  public stateFormat: CollaborationContext['stateFormat'] = 'legacy-text-v1';
 
   public consumeTicket(
     ticket: string,
@@ -60,6 +62,7 @@ class InMemoryCollaborationService {
       documentId,
       permission: readOnly ? 'viewer' : 'editor',
       readOnly,
+      stateFormat: this.stateFormat,
     });
   }
 
@@ -158,6 +161,50 @@ describe('collaboration gateway', () => {
       await server.destroy();
     }
   });
+
+  it('converges and persists Milkdown XML state across writers', async () => {
+    const codec = await getMilkdownCodec();
+    const service = new InMemoryCollaborationService();
+    service.stateFormat = 'milkdown-xml-v1';
+    service.state = codec.createState('# Structured room\n');
+    const server = createCollaborationServer(
+      config,
+      service as unknown as CollaborationService,
+    );
+    await server.listen(0);
+
+    try {
+      const writerA = createProvider(server.webSocketURL, 'writer-a');
+      const writerB = createProvider(server.webSocketURL, 'writer-b');
+      await Promise.all([
+        waitForSync(writerA, 'structured writer A sync'),
+        waitForSync(writerB, 'structured writer B sync'),
+      ]);
+      const fragmentA = writerA.document.getXmlFragment('milkdown');
+      const fragmentB = writerB.document.getXmlFragment('milkdown');
+      const paragraph = new Y.XmlElement('paragraph');
+      paragraph.insert(0, [new Y.XmlText('Shared paragraph')]);
+      fragmentA.insert(fragmentA.length, [paragraph]);
+      await waitForXmlLength(
+        fragmentB,
+        fragmentA.length,
+        'structured convergence',
+      );
+
+      server.hocuspocus.flushPendingStores();
+      await server.hocuspocus
+        .openDirectConnection(roomName)
+        .then(async (connection) => connection.disconnect());
+      const restored = new Y.Doc();
+      Y.applyUpdate(restored, service.state);
+      expect(codec.read(restored)).toContain('Shared paragraph');
+      expect(restored.getText('content').length).toBe(0);
+      restored.destroy();
+    } finally {
+      providers.splice(0).forEach((provider) => provider.destroy());
+      await server.destroy();
+    }
+  });
 });
 
 function createProvider(url: string, ticket: string): HocuspocusProvider {
@@ -199,6 +246,22 @@ function waitForDocument(
       resolve();
     };
     document.on('update', handleUpdate);
+  });
+}
+
+function waitForXmlLength(
+  fragment: Y.XmlFragment,
+  length: number,
+  label: string,
+): Promise<void> {
+  if (fragment.length === length) return Promise.resolve();
+  return withTimeout<void>(label, (resolve) => {
+    const handleUpdate = () => {
+      if (fragment.length !== length) return;
+      fragment.unobserve(handleUpdate);
+      resolve();
+    };
+    fragment.observe(handleUpdate);
   });
 }
 

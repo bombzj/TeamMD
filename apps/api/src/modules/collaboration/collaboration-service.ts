@@ -1,4 +1,6 @@
 import type {
+  CollaborationEditorProtocol,
+  CollaborationStateFormat,
   CollaborationTicketResponse,
   DocumentContentResponse,
 } from '@teammd/contracts';
@@ -19,6 +21,7 @@ export type CollaborationContext = {
   documentId: string;
   permission: DocumentContentResponse['permission'];
   readOnly: boolean;
+  stateFormat: CollaborationStateFormat;
 };
 
 export class CollaborationService {
@@ -29,6 +32,7 @@ export class CollaborationService {
     sessionId: string,
     documentId: string,
     websocketUrl: string,
+    editorProtocol: CollaborationEditorProtocol,
   ): Promise<CollaborationTicketResponse> {
     const now = new Date();
     const [access, session] = await Promise.all([
@@ -51,6 +55,11 @@ export class CollaborationService {
       throw authenticationRequired();
     }
 
+    const stateFormat = await this.getStateFormat(documentId);
+    if (stateFormat !== editorProtocol) {
+      throw protocolMismatch(stateFormat);
+    }
+
     const ticket = createOpaqueToken();
     const expiresAt = new Date(now.getTime() + ticketLifetimeMilliseconds);
     await this.prisma.collaborationTicket.create({
@@ -59,6 +68,7 @@ export class CollaborationService {
         documentId,
         sessionId,
         userId,
+        stateFormat: toStoredStateFormat(stateFormat),
         expiresAt,
       },
     });
@@ -66,6 +76,7 @@ export class CollaborationService {
       ticket,
       documentId,
       permission: access.permission,
+      stateFormat,
       websocketUrl,
       expiresAt: expiresAt.toISOString(),
     };
@@ -101,6 +112,16 @@ export class CollaborationService {
         documentId,
         'read',
       );
+      const state = await transaction.collaborationState.findUnique({
+        where: { documentId },
+        select: { stateFormat: true },
+      });
+      const stateFormat = fromStoredStateFormat(
+        state?.stateFormat ?? 'LEGACY_TEXT_V1',
+      );
+      if (stateFormat !== fromStoredStateFormat(stored.stateFormat)) {
+        throw protocolMismatch(stateFormat);
+      }
       const consumed = await transaction.collaborationTicket.updateMany({
         where: {
           id: stored.id,
@@ -118,8 +139,19 @@ export class CollaborationService {
         documentId,
         permission: access.permission,
         readOnly: access.permission === 'viewer',
+        stateFormat,
       };
     });
+  }
+
+  public async getStateFormat(
+    documentId: string,
+  ): Promise<CollaborationStateFormat> {
+    const state = await this.prisma.collaborationState.findUnique({
+      where: { documentId },
+      select: { stateFormat: true },
+    });
+    return fromStoredStateFormat(state?.stateFormat ?? 'LEGACY_TEXT_V1');
   }
 
   public async loadState(documentId: string): Promise<Uint8Array> {
@@ -179,6 +211,7 @@ export class CollaborationService {
   public async storeState(
     documentId: string,
     yjsState: Uint8Array,
+    expectedFormat?: CollaborationStateFormat,
   ): Promise<void> {
     if (yjsState.byteLength > maximumYjsStateBytes) {
       throw new ApiError(
@@ -187,10 +220,37 @@ export class CollaborationService {
         'The collaborative document state is too large.',
       );
     }
-    await this.prisma.collaborationState.update({
-      where: { documentId },
+    await this.prisma.collaborationState.updateMany({
+      where: {
+        documentId,
+        ...(expectedFormat === undefined
+          ? {}
+          : { stateFormat: toStoredStateFormat(expectedFormat) }),
+      },
       data: { yjsState: Buffer.from(yjsState) },
     });
+  }
+
+  public async convertLegacyState(
+    documentId: string,
+    yjsState: Uint8Array,
+  ): Promise<boolean> {
+    if (yjsState.byteLength > maximumYjsStateBytes) {
+      throw new ApiError(
+        413,
+        'VALIDATION_ERROR',
+        'The collaborative document state is too large.',
+      );
+    }
+    const converted = await this.prisma.collaborationState.updateMany({
+      where: { documentId, stateFormat: 'LEGACY_TEXT_V1' },
+      data: {
+        generation: { increment: 1 },
+        stateFormat: 'MILKDOWN_XML_V1',
+        yjsState: Buffer.from(yjsState),
+      },
+    });
+    return converted.count === 1;
   }
 
   public async getCheckpointRevisionId(documentId: string): Promise<string> {
@@ -203,6 +263,27 @@ export class CollaborationService {
     }
     return state.checkpointRevisionId;
   }
+}
+
+function toStoredStateFormat(
+  format: CollaborationStateFormat,
+): 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1' {
+  return format === 'legacy-text-v1' ? 'LEGACY_TEXT_V1' : 'MILKDOWN_XML_V1';
+}
+
+function fromStoredStateFormat(
+  format: 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1',
+): CollaborationStateFormat {
+  return format === 'LEGACY_TEXT_V1' ? 'legacy-text-v1' : 'milkdown-xml-v1';
+}
+
+function protocolMismatch(stateFormat: CollaborationStateFormat): ApiError {
+  return new ApiError(
+    409,
+    'COLLABORATION_PROTOCOL_MISMATCH',
+    'The collaboration room requires a different editor version.',
+    { stateFormat },
+  );
 }
 
 function authenticationRequired(): ApiError {

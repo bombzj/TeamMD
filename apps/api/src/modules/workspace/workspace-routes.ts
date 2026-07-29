@@ -1,4 +1,5 @@
 import {
+  collaborationTicketRequestSchema,
   collaborationCheckpointResponseSchema,
   collaborativeCheckpointRequestSchema,
   collaborationTicketResponseSchema,
@@ -294,11 +295,26 @@ export function registerWorkspaceRoutes(
     mutationRateLimit(),
     async (request, reply) => {
       const session = requireMutationSession(request, options);
+      const body = collaborationTicketRequestSchema.parse(request.body);
+      if (body.editorProtocol === 'milkdown-xml-v1') {
+        if (options.collaborationCheckpointService === undefined) {
+          throw new ApiError(
+            503,
+            'INTERNAL_ERROR',
+            'Collaboration migration is temporarily unavailable.',
+          );
+        }
+        await options.collaborationCheckpointService.migrateToMilkdown(
+          session.user.id,
+          request.params.documentId,
+        );
+      }
       const result = await options.collaborationService.createTicket(
         session.user.id,
         session.id,
         request.params.documentId,
         options.collaborationWebsocketUrl,
+        body.editorProtocol,
       );
       return reply
         .header('Cache-Control', 'no-store')

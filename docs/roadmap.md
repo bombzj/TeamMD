@@ -71,6 +71,18 @@ Real-time work must not weaken explicit snapshots, auditability, revocation, or 
 
 **Exit:** two authorized accounts converge on the same document, explicit Save creates one immutable server-authoritative revision, viewers cannot edit, and access changes force room reauthorization. Complete.
 
+## Phase 7: Rendered-In-Place Collaborative Editing
+
+- Replace the split CodeMirror/Vditor live canvas with Milkdown as the sole writable rendered Markdown surface. In progress.
+- Introduce versioned collaboration-state formats and editor protocol negotiation.
+- Add a pinned server/client Markdown codec for Milkdown's Yjs `XmlFragment`.
+- Convert legacy rooms atomically while preserving unsaved shared drafts and incrementing room generation.
+- Keep Vditor only for sanitized immutable history and public-document rendering.
+- Gate conversion on a supported-Markdown round-trip corpus and leave lossy documents on the legacy editor.
+- Add two-browser tests for convergence, awareness, collaborative undo, checkpoint, restore, reconnect, revocation, read-only mode, IME, and mobile layout.
+
+**Exit:** users edit rendered Markdown directly with no separate preview, two clients converge through the structured Yjs document, server checkpoints remain canonical Markdown, existing drafts and immutable revisions are preserved, and incompatible clients cannot create divergent live roots.
+
 ## Deferred: Durable Offline-First Editing
 
 Online reconnect and durable server-side Yjs state are complete. True offline-first editing remains a separate milestone requiring IndexedDB-backed Yjs persistence, bounded offline queues/storage, collaboration-generation handling after restore, revocation semantics while disconnected, and deterministic multi-device reconciliation tests. It must not ship as a partial cache feature that weakens explicit-save or no-data-loss guarantees.

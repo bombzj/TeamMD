@@ -8,7 +8,6 @@ const collaboration = vi.hoisted(() => ({
   content: '',
   creationCount: 0,
   options: null as null | {
-    readOnly: boolean;
     onContentChange: (content: string) => void;
     onRestore: () => void;
     onPermissionChange: (permission: 'owner' | 'editor' | 'viewer') => void;
@@ -19,8 +18,6 @@ const collaboration = vi.hoisted(() => ({
 }));
 
 type MockEditorOptions = {
-  initialContent: string;
-  readOnly: boolean;
   onContentChange: (content: string) => void;
   onRestore: () => void;
   onPermissionChange: (permission: 'owner' | 'editor' | 'viewer') => void;
@@ -31,7 +28,9 @@ type MockEditorOptions = {
 vi.mock('./collaborative-editor.js', () => ({
   createCollaborativeEditor: vi.fn((options: MockEditorOptions) => {
     collaboration.creationCount += 1;
-    collaboration.content = options.initialContent;
+    if (collaboration.content.length === 0) {
+      collaboration.content = documentResponse.content;
+    }
     collaboration.options = options;
     options.onTransportChange('synced');
     options.onContentChange(collaboration.content);
@@ -152,7 +151,7 @@ describe('DocumentEditor', () => {
     renderEditor();
 
     expect(await screen.findByText('Shared document · View only')).toBeTruthy();
-    await waitFor(() => expect(collaboration.options?.readOnly).toBe(true));
+    await waitFor(() => expect(screen.queryByText('Save')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(screen.getByText('View only')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
@@ -397,6 +396,9 @@ describe('DocumentEditor', () => {
       const url = requestUrl(input);
       if (url === `/api/v1/documents/${documentId}`) {
         documentLoads += 1;
+        if (documentLoads === 2) {
+          collaboration.content = '# Restored remotely\n';
+        }
         return Promise.resolve(
           jsonResponse(
             documentLoads === 1
@@ -511,6 +513,7 @@ function collaborationTicket() {
     ticket: 'a'.repeat(43),
     documentId,
     permission: 'owner',
+    stateFormat: 'legacy-text-v1',
     websocketUrl: 'ws://localhost:3001/',
     expiresAt: '2026-07-28T00:01:00.000Z',
   };

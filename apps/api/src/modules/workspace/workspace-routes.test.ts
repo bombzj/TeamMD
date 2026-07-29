@@ -137,12 +137,14 @@ class FakeCollaborationService {
     ticket: 'a'.repeat(43),
     documentId: document.id,
     permission: 'owner',
+    stateFormat: 'legacy-text-v1',
     websocketUrl: config.collaborationUrl,
     expiresAt: '2026-07-27T12:01:00.000Z',
   });
 }
 
 class FakeCollaborationCheckpointService {
+  public migrateToMilkdown = vi.fn().mockResolvedValue(undefined);
   public checkpoint = vi.fn().mockResolvedValue({
     ...saveResponse,
     contentHash:
@@ -370,6 +372,7 @@ describe('workspace routes', () => {
       method: 'POST',
       url: `/api/v1/documents/${document.id}/collaboration-ticket`,
       headers: authHeaders(),
+      payload: { editorProtocol: 'legacy-text-v1' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -381,6 +384,66 @@ describe('workspace routes', () => {
       'cm1234567890sessionidxyz',
       document.id,
       config.collaborationUrl,
+      'legacy-text-v1',
+    );
+  });
+
+  it('rejects collaboration tickets without a supported editor protocol', async () => {
+    const collaborationService = new FakeCollaborationService();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      collaborationService,
+    );
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/collaboration-ticket`,
+      headers: authHeaders(),
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(errorResponseSchema.parse(response.json()).error.code).toBe(
+      'VALIDATION_ERROR',
+    );
+    expect(collaborationService.createTicket).not.toHaveBeenCalled();
+  });
+
+  it('migrates a legacy room before issuing a Milkdown ticket', async () => {
+    const collaborationService = new FakeCollaborationService();
+    collaborationService.createTicket.mockResolvedValueOnce({
+      ...(await collaborationService.createTicket()),
+      stateFormat: 'milkdown-xml-v1',
+    });
+    collaborationService.createTicket.mockClear();
+    const checkpointService = new FakeCollaborationCheckpointService();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      collaborationService,
+      checkpointService,
+    );
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/collaboration-ticket`,
+      headers: authHeaders(),
+      payload: { editorProtocol: 'milkdown-xml-v1' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(checkpointService.migrateToMilkdown).toHaveBeenCalledWith(
+      userId,
+      document.id,
+    );
+    expect(collaborationService.createTicket).toHaveBeenCalledWith(
+      userId,
+      'cm1234567890sessionidxyz',
+      document.id,
+      config.collaborationUrl,
+      'milkdown-xml-v1',
+    );
+    expect(
+      checkpointService.migrateToMilkdown.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      collaborationService.createTicket.mock.invocationCallOrder[0]!,
     );
   });
 

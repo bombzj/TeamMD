@@ -6,7 +6,7 @@ TeamMD is a browser application backed by a versioned HTTP API, a Hocuspocus Web
 
 ```mermaid
 flowchart LR
-  Browser[React web app<br/>CodeMirror + Yjs<br/>Vditor preview] -->|HTTPS JSON + cookie| API[Fastify API]
+  Browser[React web app<br/>Milkdown + Yjs] -->|HTTPS JSON + cookie| API[Fastify API]
   Public[Anonymous read-only viewer] -->|HTTPS POST + fragment bearer| API
   Browser -->|Authenticated WebSocket<br/>Yjs updates + awareness| Gateway[Hocuspocus gateway]
   API --> Contracts[Shared Zod contracts]
@@ -36,7 +36,8 @@ Prefer same-site deployment such as `app.example.com` and `api.example.com`. If 
 
 - Routes and authenticated application shell
 - File tree, Shared with me, Trash, editor, history, sharing, and anonymous public-document views
-- CodeMirror/Yjs/Hocuspocus lifecycle adapter and Vditor preview sanitization
+- Milkdown/Yjs/Hocuspocus lifecycle adapter and rendered-in-place editing
+- Sanitized Vditor rendering for immutable history and anonymous public documents
 - API client, query cache, dirty-state guards, and conflict UI
 - Presentation-only permission checks
 
@@ -112,7 +113,7 @@ sequenceDiagram
   API-->>Room: Broadcast checkpoint metadata
 ```
 
-The collaborative client never submits whole-document Markdown for a checkpoint. The server reads the authoritative room, creates a snapshot, and advances the head transactionally. The legacy full-document save contract retains `baseRevisionId` conflict protection for non-collaborative callers, but it is not the writable collaborative editor path.
+The collaborative client never submits whole-document Markdown for a checkpoint. The server reads the authoritative room, serializes its versioned structured state to canonical Markdown, creates a snapshot, and advances the head transactionally. The legacy full-document save contract retains `baseRevisionId` conflict protection for non-collaborative callers, but it is not the writable collaborative editor path.
 
 ### Grant Registered Account Access
 
@@ -199,6 +200,8 @@ Document content, passwords, cookies, CSRF values, public-link or invitation tok
 
 ## Real-Time Collaboration
 
-Real-time collaboration is an additive boundary, not an altered meaning of the save endpoint. The collaboration module authenticates WebSocket upgrades with short-lived one-time tickets, authorizes Yjs rooms through the same document policy as HTTP, persists CRDT updates, and materializes immutable Markdown checkpoints on explicit Save. CodeMirror is the writable Yjs-bound source editor and Vditor renders sanitized preview. Presence remains ephemeral. Explicit revision history, revocation, export, and conflict recovery remain supported throughout migration. See ADR 0002.
+Real-time collaboration is an additive boundary, not an altered meaning of the save endpoint. The collaboration module authenticates WebSocket upgrades with short-lived one-time tickets, authorizes Yjs rooms through the same document policy as HTTP, persists CRDT updates, and materializes immutable Markdown checkpoints on explicit Save. Milkdown is the sole writable rendered-in-place editor and binds its ProseMirror document to a versioned Yjs `XmlFragment`; Vditor is read-only and limited to sanitized history/public rendering. Presence remains ephemeral. Explicit revision history, revocation, export, and conflict recovery remain supported throughout migration. See ADR 0002 and ADR 0004.
+
+Existing `Y.Text('content')` rooms use the legacy state format. A request for a structured editor ticket triggers conversion before the final ticket is issued. Conversion runs while the room is serialized and disconnected: preserve the complete operational draft, verify Markdown fidelity, create a fresh structured Yjs document, persist the new format, and increment the generation. Ticket negotiation prevents legacy and structured clients from creating parallel writable roots.
 
 Transient reconnect is supported. Durable offline-first editing is deliberately separate from reconnect: it requires browser-side Yjs persistence, bounded queues, generation-aware restore handling, offline revocation semantics, and tested multi-device reconciliation. The current release does not claim offline-first behavior.

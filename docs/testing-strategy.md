@@ -36,9 +36,10 @@ Do not substitute SQLite for MySQL transaction, collation, unique-index, or lock
 
 Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not React internals. Cover:
 
-- the CodeMirror/Yjs adapter initializes once, obtains fresh reconnect tickets, and destroys provider/listeners/instances;
-- awareness changes update the anonymous participant count while cursor/selection identity remains generic and ephemeral;
-- Vditor receives only sanitized preview input and is never a second writable surface;
+- the Milkdown/Yjs adapter initializes once, obtains fresh reconnect tickets, binds one `Y.XmlFragment`, and destroys provider/listeners/instances;
+- awareness changes update participant count and trusted ephemeral cursor/selection identity;
+- rendered Markdown is directly editable without a second live preview, while Vditor remains read-only for static history/public content;
+- read-only mode, IME composition, collaborative undo, clipboard Markdown, tables, code blocks, links, and narrow viewports remain stable;
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
 - background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;
 - restore control events force an authorized refetch and a fresh Yjs document while ending at a clean saved revision;
@@ -55,7 +56,7 @@ Use Playwright against built web/API applications and isolated MySQL data. Criti
 2. Save multiple revisions, inspect history, restore one, and verify a new head.
 3. Owner grants an existing account editor access; editor opens the shared document and saves; owner sees the checkpoint.
 4. Two browser contexts edit concurrently, converge, and observe the same explicit checkpoint without text loss.
-5. Both contexts show the current participant count and remote selections without exposing account email addresses.
+5. Both contexts show the current participant count and authenticated remote selections without accepting spoofed awareness identity.
 6. Owner revokes editor; editor's already-open page can no longer save or refetch content.
 7. Viewer can read but cannot mutate through UI or direct request.
 8. Trash and restore a folder subtree; permanently delete with confirmation.
@@ -87,6 +88,10 @@ Create a document at revision 1 and connect two independent Yjs providers. Apply
 - edits after the captured checkpoint remain visibly unsaved.
 
 Repeat enough times in MySQL CI to expose race behavior, but keep one deterministic service-level locking test for fast feedback.
+
+## Rendered Editor Migration Gate
+
+Before converting legacy rooms automatically, run a Markdown corpus through parse/serialize and assert semantic equivalence for headings, emphasis, links, images, blockquotes, nested lists, task lists, tables, fenced code, inline code, escapes, Unicode, and line endings. Verify that a legacy room with an unsaved shared draft converts atomically to `MILKDOWN_XML_V1`, increments generation, rejects legacy clients, converges in two browsers, checkpoints the server serialization, restores into a fresh structured document, and leaves all previous revisions byte-identical.
 
 ## Quality Gates
 

@@ -2,20 +2,34 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('collaborative editor selection styling', () => {
-  it('keeps local CodeMirror and native text selections visible', async () => {
-    const [editorSource, globalStyles] = await Promise.all([
-      readFile(
-        resolve(process.cwd(), 'src/features/editor/collaborative-editor.ts'),
-        'utf8',
-      ),
-      readFile(resolve(process.cwd(), 'src/styles/global.css'), 'utf8'),
-    ]);
+describe('collaborative editor rendering', () => {
+  it('binds Milkdown and styles local selections and remote identities', async () => {
+    const globalStyles = await readFile(
+      resolve(process.cwd(), 'src/styles/global.css'),
+      'utf8',
+    );
+    const editorSource = await readFile(
+      resolve(process.cwd(), 'src/features/editor/collaborative-editor.ts'),
+      'utf8',
+    );
+    const mainSource = await readFile(
+      resolve(process.cwd(), 'src/main.tsx'),
+      'utf8',
+    );
 
-    expect(editorSource).toContain('drawSelection()');
-    expect(globalStyles).toContain('.codemirror-host .cm-content ::selection');
-    expect(globalStyles).toContain('.cm-selectionBackground');
+    expect(editorSource).toContain("getXmlFragment('milkdown')");
+    expect(editorSource).toContain('.bindXmlFragment(');
+    expect(mainSource).toContain(
+      "import '@milkdown/crepe/theme/common/style.css';",
+    );
+    expect(mainSource.indexOf('theme/common/style.css')).toBeLessThan(
+      mainSource.indexOf('theme/classic.css'),
+    );
+    expect(globalStyles).toContain('.milkdown-host .ProseMirror ::selection');
     expect(globalStyles).toContain('background: #9bc9e9');
-    expect(globalStyles).toContain('background: rgba(244, 240, 231, 0.42)');
+    expect(globalStyles).toContain('.milkdown-host .ProseMirror-yjs-cursor {');
+    expect(globalStyles).toContain(
+      '.milkdown-host .ProseMirror-yjs-cursor > div {',
+    );
   });
 });

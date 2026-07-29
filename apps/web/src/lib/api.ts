@@ -221,7 +221,7 @@ export async function createCollaborationTicket(
 ): Promise<CollaborationTicketResponse> {
   return requestJson(
     `/api/v1/documents/${documentId}/collaboration-ticket`,
-    mutation('POST'),
+    mutation('POST', { editorProtocol: 'milkdown-xml-v1' }),
     (value) => collaborationTicketResponseSchema.parse(value),
   );
 }

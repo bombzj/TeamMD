@@ -38,13 +38,16 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 
 ### Editing And Saves
 
-- **REQ-EDIT-001:** An authorized editor can edit Markdown in the CodeMirror/Yjs surface, see a sanitized Vditor preview, and see dirty, saving, saved, failed, read-only, and connection states.
+- **REQ-EDIT-001:** An authorized editor can edit rendered Markdown directly in one Milkdown/Yjs surface without a separate live preview and can see dirty, saving, saved, failed, read-only, and connection states.
 - **REQ-EDIT-002:** Save is explicit through a button and `Ctrl+S` or `Cmd+S`; leaving with unsaved changes triggers a navigation warning.
 - **REQ-EDIT-003:** Each successful save atomically creates one immutable revision and makes it the document head.
 - **REQ-EDIT-004:** A legacy whole-document save must identify the revision from which editing began and receives a conflict response for a stale base. A collaborative Save checkpoints the server-authoritative Yjs room after pending updates are synchronized; neither path silently overwrites newer content.
 - **REQ-EDIT-005:** Content is bounded by a configurable UTF-8 byte limit. The initial proposal is 2 MiB per revision.
 - **REQ-EDIT-006:** Authorized editors connected to the same collaborative document converge on the same Markdown text without whole-document last-write-wins replacement.
 - **REQ-EDIT-007:** Collaborative operational updates are distinct from immutable revisions. Explicit Save captures a durable server-authoritative checkpoint; presence and cursors are ephemeral.
+- **REQ-EDIT-008:** The collaborative editor stores structured operational state in a versioned Yjs `XmlFragment`, while every immutable revision remains canonical portable Markdown serialized by the server.
+- **REQ-EDIT-009:** Migrating an existing collaborative room preserves its complete shared draft, increments the room generation, and rejects incompatible editor protocols. Migration never rewrites existing immutable revisions.
+- **REQ-EDIT-010:** Supported Markdown constructs round-trip through the rendered editor without semantic loss. Documents containing unsupported or lossy syntax remain on the legacy source editor until the user can resolve the incompatibility explicitly.
 
 ### Sharing
 
@@ -90,7 +93,7 @@ The current release supports direct sharing to an existing registered account an
 - Offline-first synchronization
 - Comments, suggestions, mentions, and notifications beyond invitation email
 - Folder-level sharing or inherited access control
-- Rich-text round-trip guarantees beyond Vditor's Markdown behavior
+- Byte-for-byte preservation of insignificant Markdown formatting such as equivalent list markers or whitespace; semantic preservation of the supported Markdown flavor remains required
 - Binary attachments, image hosting, publishing, plugins, or arbitrary HTML execution
 - Native mobile or desktop applications
 
@@ -108,7 +111,7 @@ The current release supports direct sharing to an existing registered account an
 - Whether public launch requires email verification before any document creation.
 - Storage quotas by user and revision count.
 - Whether collaborator access survives an owner's trash action or remains suspended until restore.
-- Exact Markdown flavor and which Vditor modes are exposed initially.
+- Exact Markdown flavor and Milkdown extension set; the migration must define these before automatic room conversion is enabled.
 
 ## Deferred Offline-First Decision
 

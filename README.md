@@ -1,6 +1,6 @@
 # TeamMD
 
-TeamMD is an online Markdown workspace with email/password accounts, personal folders, explicit immutable revision checkpoints, and document sharing. CodeMirror is the writable collaborative editor; Vditor renders the sanitized Markdown preview.
+TeamMD is an online Markdown workspace with email/password accounts, personal folders, explicit immutable revision checkpoints, and document sharing. TeamMD is migrating its writable surface from split CodeMirror source/preview editing to Milkdown: rendered-in-place Markdown editing with a native Yjs collaboration binding. Vditor remains the sanitized static renderer for immutable history and public documents during this migration.
 
 The repository includes a runnable React application, shared Zod contracts, a Fastify API with Argon2id and revocable cookie sessions, reviewed MySQL migrations, and a Yjs/Hocuspocus collaboration gateway. Registered users can organize documents, edit the same document concurrently, create and restore explicit revision checkpoints, share documents directly with other registered accounts, and publish revocable read-only links to the current saved revision. Tokenized invitations for unregistered email recipients remain planned.
 
@@ -8,28 +8,28 @@ The repository includes a runnable React application, shared Zod contracts, a Fa
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- CodeMirror/Yjs editing with Vditor preview and explicit Save states
+- Rendered-in-place Milkdown/Yjs editing with explicit Save states (migration in progress)
 - Immutable revision snapshots with history and restore
 - Direct document sharing with `owner`, `editor`, or `viewer` access
 - Owner-managed, revocable public links to the current saved revision
 - CRDT convergence without whole-document last-write-wins replacement
 - Trash and restore for documents and folders
 
-CRDT-based simultaneous editing is implemented. The Yjs awareness channel and CodeMirror binding provide an ephemeral participant count and remote selections/cursors, using generic collaborator labels rather than exposing account identities. Public links are read-only, expose no private hierarchy or collaborator metadata, and never publish unsaved Yjs drafts. Comments, durable offline-first editing, pending-email invitations, and native applications remain later phases.
+CRDT-based simultaneous editing is implemented. The current CodeMirror binding is being replaced by Milkdown's ProseMirror/Yjs binding so formatting renders in the writable surface without a separate live preview. The Yjs awareness channel provides an ephemeral participant count and remote selections/cursors. Public links are read-only, expose no private hierarchy or collaborator metadata, and never publish unsaved Yjs drafts. Comments, durable offline-first editing, pending-email invitations, and native applications remain later phases.
 
 Transient network interruptions are handled by Hocuspocus reconnect and durable server-side Yjs state. True offline-first editing is intentionally deferred: it requires persistent browser-side Yjs storage, bounded offline queues, generation-aware restore and revocation handling, and tested reconciliation before it can meet TeamMD's no-data-loss standard.
 
 ## Stack
 
-| Area          | Choice                                                         |
-| ------------- | -------------------------------------------------------------- |
-| Web           | React 19, Vite, TypeScript, CodeMirror, Vditor, TanStack Query |
-| Collaboration | Yjs, Hocuspocus, `y-codemirror.next`                           |
-| API           | Node.js 22 LTS, Fastify, TypeScript, Zod                       |
-| Data          | MySQL 8.4, Prisma migrations                                   |
-| Auth          | Argon2id, opaque cookie sessions, CSRF protection              |
-| Tests         | Vitest and Fastify injection                                   |
-| Workspace     | pnpm monorepo                                                  |
+| Area          | Choice                                                       |
+| ------------- | ------------------------------------------------------------ |
+| Web           | React 19, Vite, TypeScript, Milkdown, Vditor, TanStack Query |
+| Collaboration | Yjs, Hocuspocus, Milkdown collaboration plugin               |
+| API           | Node.js 22 LTS, Fastify, TypeScript, Zod                     |
+| Data          | MySQL 8.4, Prisma migrations                                 |
+| Auth          | Argon2id, opaque cookie sessions, CSRF protection            |
+| Tests         | Vitest and Fastify injection                                 |
+| Workspace     | pnpm monorepo                                                |
 
 ## Repository Layout
 

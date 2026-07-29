@@ -154,6 +154,7 @@ model CollaborationTicket {
   documentId String    @db.VarChar(30)
   sessionId  String    @db.VarChar(30)
   userId     String    @db.VarChar(30)
+  stateFormat CollaborationStateFormat @default(LEGACY_TEXT_V1)
   expiresAt  DateTime  @db.DateTime(3)
   consumedAt DateTime? @db.DateTime(3)
   createdAt  DateTime  @default(now()) @db.DateTime(3)
@@ -168,6 +169,7 @@ model CollaborationTicket {
 model CollaborationState {
   documentId          String   @id @db.VarChar(30)
   generation          Int      @default(1)
+  stateFormat          CollaborationStateFormat @default(LEGACY_TEXT_V1)
   yjsState             Bytes    @db.LongBlob
   checkpointRevisionId String   @db.VarChar(30)
   updatedAt            DateTime @updatedAt @db.DateTime(3)
@@ -184,4 +186,9 @@ model DocumentPublicLink {
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
+}
+
+enum CollaborationStateFormat {
+  LEGACY_TEXT_V1
+  MILKDOWN_XML_V1
 }

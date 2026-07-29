@@ -7,5 +7,7 @@
 - Enforce authorization in the API; client-side checks are presentation only.
 - Model every successful document save as an immutable revision and reject stale writes.
 - Preserve Yjs real-time collaboration while keeping explicit immutable checkpoints as the only saved-history boundary.
+- Treat Milkdown's Yjs-bound `Y.XmlFragment` as the target writable state. Keep Vditor read-only and limited to sanitized static history/public rendering.
+- Version collaboration state and preserve the full shared draft when converting legacy `Y.Text` rooms. Never introduce parallel writable roots or silently normalize unsupported Markdown.
 - Add focused tests for changed behavior and run the narrowest relevant validation command.
 - Do not commit secrets or real credentials. Keep `.env.example` synchronized with required settings.

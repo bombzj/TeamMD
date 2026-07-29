@@ -6,6 +6,7 @@ import type {
   CollaborationContext,
   CollaborationService,
 } from './collaboration-service.js';
+import { getMilkdownCodec } from './milkdown-codec.js';
 
 const maximumMarkdownBytes = 2 * 1024 * 1024;
 const maximumSocketPayloadBytes = 3 * 1024 * 1024;
@@ -44,10 +45,11 @@ export function createCollaborationServer(
     async onLoadDocument({ documentName }) {
       return collaborationService.loadState(documentName);
     },
-    async onStoreDocument({ documentName, document }) {
+    async onStoreDocument({ documentName, document, lastContext }) {
       await collaborationService.storeState(
         documentName,
         Y.encodeStateAsUpdate(document),
+        lastContext.stateFormat,
       );
     },
     beforeHandleAwareness({ states, context }) {
@@ -66,15 +68,18 @@ export function createCollaborationServer(
       }
       return Promise.resolve();
     },
-    beforeSync({ document, type, payload }) {
+    async beforeSync({ context, document, type, payload }) {
       if (type === 0) return Promise.resolve();
       const candidate = new Y.Doc();
       try {
         Y.applyUpdate(candidate, Y.encodeStateAsUpdate(document));
         Y.applyUpdate(candidate, payload);
+        const markdown =
+          context.stateFormat === 'milkdown-xml-v1'
+            ? (await getMilkdownCodec()).read(candidate)
+            : candidate.getText('content').toJSON();
         if (
-          new TextEncoder().encode(candidate.getText('content').toJSON())
-            .byteLength > maximumMarkdownBytes
+          new TextEncoder().encode(markdown).byteLength > maximumMarkdownBytes
         ) {
           throw new Error('Markdown content is too large.');
         }

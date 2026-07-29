@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  collaborationTicketRequestSchema,
+  collaborationTicketResponseSchema,
   createDocumentRequestSchema,
   createFolderRequestSchema,
   documentContentResponseSchema,
@@ -20,6 +22,29 @@ import {
 } from './index.js';
 
 describe('workspace contracts', () => {
+  it('negotiates a versioned collaboration editor protocol', () => {
+    expect(
+      collaborationTicketRequestSchema.parse({
+        editorProtocol: 'legacy-text-v1',
+      }),
+    ).toEqual({ editorProtocol: 'legacy-text-v1' });
+    expect(() =>
+      collaborationTicketRequestSchema.parse({
+        editorProtocol: 'unknown-v2',
+      }),
+    ).toThrow();
+    expect(
+      collaborationTicketResponseSchema.parse({
+        ticket: 'a'.repeat(43),
+        documentId: 'cm1234567890documentabcde',
+        permission: 'editor',
+        stateFormat: 'milkdown-xml-v1',
+        websocketUrl: 'ws://127.0.0.1:3001',
+        expiresAt: '2026-07-29T00:00:00.000Z',
+      }).stateFormat,
+    ).toBe('milkdown-xml-v1');
+  });
+
   it('accepts bounded folder and document creation requests', () => {
     expect(
       createFolderRequestSchema.parse({ name: 'Projects', parentId: null }),

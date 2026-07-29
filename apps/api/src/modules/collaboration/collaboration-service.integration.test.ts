@@ -98,7 +98,9 @@ describe('CollaborationService with MySQL', () => {
       ownerSessionId,
       created.id,
       'ws://127.0.0.1:3001',
+      'legacy-text-v1',
     );
+    expect(ownerTicket.stateFormat).toBe('legacy-text-v1');
     const ownerContext = await collaborationService.consumeTicket(
       ownerTicket.ticket,
       created.id,
@@ -109,16 +111,44 @@ describe('CollaborationService with MySQL', () => {
       documentId: created.id,
       permission: 'owner',
       readOnly: false,
+      stateFormat: 'legacy-text-v1',
     });
     await expect(
       collaborationService.consumeTicket(ownerTicket.ticket, created.id),
     ).rejects.toMatchObject({ code: 'AUTHENTICATION_REQUIRED' });
+
+    await collaborationService.loadState(created.id);
+    const staleProtocolTicket = await collaborationService.createTicket(
+      ownerId,
+      ownerSessionId,
+      created.id,
+      'ws://127.0.0.1:3001',
+      'legacy-text-v1',
+    );
+    await prisma.collaborationState.update({
+      where: { documentId: created.id },
+      data: { stateFormat: 'MILKDOWN_XML_V1' },
+    });
+    await expect(
+      collaborationService.consumeTicket(
+        staleProtocolTicket.ticket,
+        created.id,
+      ),
+    ).rejects.toMatchObject({
+      code: 'COLLABORATION_PROTOCOL_MISMATCH',
+      details: { stateFormat: 'milkdown-xml-v1' },
+    });
+    await prisma.collaborationState.update({
+      where: { documentId: created.id },
+      data: { stateFormat: 'LEGACY_TEXT_V1' },
+    });
 
     const viewerTicket = await collaborationService.createTicket(
       viewerId,
       viewerSessionId,
       created.id,
       'ws://127.0.0.1:3001',
+      'legacy-text-v1',
     );
     await expect(
       collaborationService.consumeTicket(viewerTicket.ticket, 'other-room'),

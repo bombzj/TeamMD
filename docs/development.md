@@ -68,8 +68,11 @@ The local runtime account is intentionally unable to create Prisma shadow databa
 - Keep route handlers thin: parse contract, call one use case, serialize contract.
 - Keep authorization and transaction logic in API domain services.
 - Pass explicit dependencies such as clock, token generator, hasher, email sender, and repositories to services where useful for deterministic tests.
-- Keep CodeMirror, Yjs, and Hocuspocus behind a React adapter that owns connection, awareness, binding, reconnect tickets, and teardown.
-- Use Vditor only for sanitized static preview. It must not be writable alongside CodeMirror.
+- Keep Milkdown, Yjs, and Hocuspocus behind a React adapter that owns connection, awareness, binding, reconnect tickets, read-only transitions, Markdown serialization, and teardown.
+- Use Milkdown's collaboration plugin and one versioned `Y.XmlFragment` as the only writable live surface. Do not synchronize whole Markdown strings or mount a second writable editor.
+- Use Vditor only for sanitized static history/public rendering. It must not be writable in a collaborative room.
+- Pin the Milkdown schema, parser, serializer, and collaboration packages together. A schema change requires a state-format compatibility review and Markdown round-trip corpus.
+- Keep the API's hidden Milkdown codec editor and JSDOM globals alive for the process lifetime. Milkdown serializers and delayed lifecycle work retain that context; early teardown can crash later requests.
 - Use TanStack Query for HTTP server state. Yjs owns the shared draft; never replace it from a background refetch.
 - Use stable error codes and exhaustive client handling for save conflicts and authentication expiry.
 - Validate environment once at startup and fail with names of invalid variables, never their secret values.
