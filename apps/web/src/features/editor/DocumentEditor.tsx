@@ -14,10 +14,14 @@ import {
   Copy,
   History,
   Link,
+  Maximize2,
   MessageSquarePlus,
+  Minimize2,
+  Redo2,
   RotateCcw,
   Save,
   Trash2,
+  Undo2,
   Users,
   X,
 } from 'lucide-react';
@@ -71,6 +75,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const [participantCount, setParticipantCount] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [fullScreen, setFullScreen] = useState(false);
   const [saveMessageOpen, setSaveMessageOpen] = useState(false);
   const [sharingOpen, setSharingOpen] = useState(false);
   const [permission, setPermission] = useState<
@@ -354,6 +359,19 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     return () => window.removeEventListener('keydown', saveShortcut);
   }, [dirty, readOnly, saveMutation, transport]);
 
+  useEffect(() => {
+    if (!fullScreen) return;
+    document.body.classList.add('editor-full-screen-open');
+    const exitFullScreen = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFullScreen(false);
+    };
+    window.addEventListener('keydown', exitFullScreen);
+    return () => {
+      document.body.classList.remove('editor-full-screen-open');
+      window.removeEventListener('keydown', exitFullScreen);
+    };
+  }, [fullScreen]);
+
   const close = () => {
     if (dirty && !window.confirm('Leave with changes not saved to history?')) {
       return;
@@ -384,7 +402,9 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     !saveMutation.isPending;
 
   return (
-    <main className="document-editor-shell">
+    <main
+      className={`document-editor-shell${fullScreen ? ' full-screen' : ''}`}
+    >
       <header className="editor-heading">
         <div className="editor-title-row">
           <button
@@ -416,6 +436,38 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
                 ? 'Not saved to history'
                 : `Revision ${revisionOrdinal}`}
           </span>
+          <button
+            className="icon-button editor-full-screen-button"
+            type="button"
+            aria-label={fullScreen ? 'Exit full screen' : 'Enter full screen'}
+            aria-pressed={fullScreen}
+            title={fullScreen ? 'Exit full screen (Esc)' : 'Enter full screen'}
+            onClick={() => setFullScreen((current) => !current)}
+          >
+            {fullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+          {!readOnly && (
+            <div className="editor-history-controls" aria-label="Edit history">
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Undo"
+                title="Undo (Ctrl/Cmd+Z)"
+                onClick={() => editorRef.current?.undo()}
+              >
+                <Undo2 size={18} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Redo"
+                title="Redo (Ctrl/Cmd+Shift+Z)"
+                onClick={() => editorRef.current?.redo()}
+              >
+                <Redo2 size={18} />
+              </button>
+            </div>
+          )}
           {!readOnly && (
             <div className="save-button-group">
               <button

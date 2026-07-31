@@ -38,7 +38,7 @@ Prefer same-site deployment such as `app.example.com` and `api.example.com`. If 
 - File tree, Shared with me, Trash, editor, history, sharing, and anonymous public-document views
 - Milkdown/Yjs/Hocuspocus lifecycle adapter and rendered-in-place editing
 - Sanitized Vditor rendering for immutable history and anonymous public documents
-- API client, query cache, dirty-state guards, and conflict UI
+- API client, query cache, dirty-state guards, full-screen/editor-history chrome, and conflict UI
 - Presentation-only permission checks
 
 Suggested internal layout:

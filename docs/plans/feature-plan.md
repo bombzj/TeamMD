@@ -18,6 +18,7 @@ The current gaps are discoverability, duplicated editor configuration, insuffici
 - The same supported feature profile is used in collaborative and standalone fallback modes.
 - Viewers remain read-only and do not see controls that imply write access.
 - Toolbar and slash-command actions remain keyboard accessible and do not obscure document content on desktop or mobile.
+- The complete editor can enter and exit a distraction-free full-screen layout without remounting the collaborative editor or losing draft state.
 - Unsupported or lossy Markdown is never silently normalized into a different meaning.
 
 ### Mermaid
@@ -129,6 +130,8 @@ The current gaps are discoverability, duplicated editor configuration, insuffici
 - [x] Phase 1: Add feature-profile drift tests.
 - [x] Phase 1: Extend codec round-trip corpus with Mermaid fences and rich constructs.
 - [ ] Phase 2: Audit and test rich controls and accessibility.
+- [x] Phase 2: Add full-screen editor mode with Escape and state-preservation tests.
+- [x] Phase 2: Add visible Yjs-aware undo and redo controls.
 - [ ] Phase 3: Add secure Mermaid renderer dependencies and limits.
 - [ ] Phase 3: Implement fenced-code Mermaid preview node view/decorations.
 - [ ] Phase 3: Add collaboration and source-preservation tests.

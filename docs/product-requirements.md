@@ -49,6 +49,8 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-009:** Migrating an existing collaborative room preserves its complete shared draft, increments the room generation, and rejects incompatible editor protocols. Migration never rewrites existing immutable revisions.
 - **REQ-EDIT-010:** Supported Markdown constructs round-trip through the rendered editor without semantic loss. Documents containing unsupported or lossy syntax remain on the legacy source editor until the user can resolve the incompatibility explicitly.
 - **REQ-EDIT-011:** If collaboration cannot initialize, an authorized user can edit the current saved revision without presence or live merging and save through the stale-base whole-document endpoint. The UI clearly identifies this degraded mode and does not claim offline-first behavior.
+- **REQ-EDIT-012:** An authorized user can expand the complete document editor into a distraction-free full-screen layout and exit with the visible control or Escape without recreating the editor, losing draft state, or disconnecting collaboration.
+- **REQ-EDIT-013:** Owners and editors have visible Undo and Redo controls that invoke the active editor history. Collaborative rooms use the client-local Yjs undo manager, standalone fallback uses ProseMirror history, and viewers receive no mutation controls.
 
 ### Sharing
 

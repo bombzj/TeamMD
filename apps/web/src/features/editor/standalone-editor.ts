@@ -1,5 +1,6 @@
 import type { CollaborativeEditor } from './collaborative-editor.js';
 import { createTeamMdEditor } from './editor-feature-profile.js';
+import { runHistoryShortcut } from './editor-history.js';
 
 type StandaloneEditorOptions = {
   content: string;
@@ -26,6 +27,8 @@ export async function createStandaloneEditor(
 
   return {
     getContent: () => currentContent,
+    undo: () => runHistoryShortcut(options.editorHost, 'undo'),
+    redo: () => runHistoryShortcut(options.editorHost, 'redo'),
     prepareCheckpoint: () => Promise.resolve(),
     destroy: () => void editor.destroy(),
   };

@@ -69,6 +69,7 @@ The local runtime account is intentionally unable to create Prisma shadow databa
 - Keep authorization and transaction logic in API domain services.
 - Pass explicit dependencies such as clock, token generator, hasher, email sender, and repositories to services where useful for deterministic tests.
 - Keep Milkdown, Yjs, and Hocuspocus behind a React adapter that owns connection, awareness, binding, reconnect tickets, read-only transitions, Markdown serialization, and teardown.
+- Route visible editor commands through the mounted Milkdown/ProseMirror command path. Collaborative Undo/Redo must use the active Yjs history, while standalone fallback uses ProseMirror history; never maintain a parallel React content history.
 - Use Milkdown's collaboration plugin and one versioned `Y.XmlFragment` as the only writable live surface. Do not synchronize whole Markdown strings or mount a second writable editor.
 - Use Vditor only for sanitized static history/public rendering. It must not be writable in a collaborative room.
 - Pin the Milkdown schema, parser, serializer, and collaboration packages together. A schema change requires a state-format compatibility review and Markdown round-trip corpus.

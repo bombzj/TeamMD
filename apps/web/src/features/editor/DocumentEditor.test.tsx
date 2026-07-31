@@ -16,6 +16,8 @@ const collaboration = vi.hoisted(() => ({
     onTransportChange: (transport: 'synced') => void;
   },
   prepareCheckpoint: vi.fn().mockResolvedValue(undefined),
+  redo: vi.fn().mockReturnValue(true),
+  undo: vi.fn().mockReturnValue(true),
 }));
 
 type MockEditorOptions = {
@@ -42,6 +44,8 @@ vi.mock('./collaborative-editor.js', () => ({
       destroy: vi.fn(),
       getContent: () => collaboration.content,
       prepareCheckpoint: collaboration.prepareCheckpoint,
+      redo: collaboration.redo,
+      undo: collaboration.undo,
     });
   }),
 }));
@@ -61,6 +65,8 @@ vi.mock('./standalone-editor.js', () => ({
         destroy: vi.fn(),
         getContent: () => collaboration.content,
         prepareCheckpoint: collaboration.prepareCheckpoint,
+        redo: collaboration.redo,
+        undo: collaboration.undo,
       });
     },
   ),
@@ -97,6 +103,8 @@ afterEach(() => {
   collaboration.creationError = null;
   collaboration.options = null;
   collaboration.prepareCheckpoint.mockClear();
+  collaboration.redo.mockClear();
+  collaboration.undo.mockClear();
   vi.unstubAllGlobals();
   beforeCrypto();
 });
@@ -274,6 +282,77 @@ describe('DocumentEditor', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(screen.getByText('View only')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Redo' })).toBeNull();
+  });
+
+  it('enters and exits full screen without recreating the editor', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url === `/api/v1/documents/${documentId}`) {
+          return Promise.resolve(jsonResponse(documentResponse));
+        }
+        if (url.endsWith('/collaboration-ticket')) {
+          return Promise.resolve(jsonResponse(collaborationTicket()));
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      }),
+    );
+    const user = userEvent.setup();
+    renderEditor();
+
+    await screen.findByRole('heading', { name: 'Readme.md' });
+    expect(collaboration.creationCount).toBe(1);
+    await user.click(screen.getByRole('button', { name: 'Enter full screen' }));
+
+    expect(
+      screen
+        .getByRole('button', { name: 'Exit full screen' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(
+      document.querySelector('.document-editor-shell.full-screen'),
+    ).not.toBeNull();
+    expect(document.body.classList.contains('editor-full-screen-open')).toBe(
+      true,
+    );
+    expect(collaboration.creationCount).toBe(1);
+
+    await user.keyboard('{Escape}');
+    expect(
+      await screen.findByRole('button', { name: 'Enter full screen' }),
+    ).toBeTruthy();
+    expect(document.body.classList.contains('editor-full-screen-open')).toBe(
+      false,
+    );
+    expect(collaboration.creationCount).toBe(1);
+  });
+
+  it('provides visible undo and redo controls for editors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url === `/api/v1/documents/${documentId}`) {
+          return Promise.resolve(jsonResponse(documentResponse));
+        }
+        if (url.endsWith('/collaboration-ticket')) {
+          return Promise.resolve(jsonResponse(collaborationTicket()));
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      }),
+    );
+    const user = userEvent.setup();
+    renderEditor();
+
+    await screen.findByRole('heading', { name: 'Readme.md' });
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(screen.getByRole('button', { name: 'Redo' }));
+
+    expect(collaboration.undo).toHaveBeenCalledOnce();
+    expect(collaboration.redo).toHaveBeenCalledOnce();
   });
 
   it('lets owners grant an existing account editor access', async () => {

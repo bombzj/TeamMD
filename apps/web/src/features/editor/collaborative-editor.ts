@@ -10,6 +10,7 @@ import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider';
 import * as Y from 'yjs';
 
 import { createTeamMdEditor } from './editor-feature-profile.js';
+import { runHistoryShortcut } from './editor-history.js';
 
 export type CollaborationTransport =
   `${WebSocketStatus}` | 'synced' | 'offline';
@@ -33,6 +34,8 @@ export type CollaborativeEditor = {
   destroy: () => void;
   getContent: () => string;
   prepareCheckpoint: () => Promise<void>;
+  redo: () => boolean;
+  undo: () => boolean;
 };
 
 export async function createCollaborativeEditor(
@@ -161,6 +164,8 @@ export async function createCollaborativeEditor(
 
   return {
     getContent: () => currentContent,
+    undo: () => runHistoryShortcut(options.editorHost, 'undo'),
+    redo: () => runHistoryShortcut(options.editorHost, 'redo'),
     prepareCheckpoint: async () => {
       if (readOnly) {
         throw new Error('You no longer have permission to save this document.');

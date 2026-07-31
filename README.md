@@ -1,14 +1,14 @@
 # TeamMD
 
-TeamMD is an online Markdown workspace with email/password accounts, personal folders, explicit immutable revision checkpoints, and document sharing. TeamMD is migrating its writable surface from split CodeMirror source/preview editing to Milkdown: rendered-in-place Markdown editing with a native Yjs collaboration binding. Vditor remains the sanitized static renderer for immutable history and public documents during this migration.
+TeamMD is an online Markdown workspace with email/password accounts, personal folders, explicit immutable revision checkpoints, and document sharing. TeamMD uses Milkdown for rendered-in-place Markdown editing with a native Yjs collaboration binding. Vditor remains the sanitized static renderer for immutable history and public documents.
 
-The repository includes a runnable React application, shared Zod contracts, a Fastify API with Argon2id and revocable cookie sessions, reviewed MySQL migrations, and a Yjs/Hocuspocus collaboration gateway. Registered users can organize documents, edit the same document concurrently, create and restore explicit revision checkpoints, share documents directly with other registered accounts, and publish revocable read-only links to the current saved revision. Tokenized invitations for unregistered email recipients remain planned.
+The repository includes a runnable React application, shared Zod contracts, a Fastify API with built-in versioned scrypt and revocable cookie sessions, reviewed MySQL migrations, and a Yjs/Hocuspocus collaboration gateway. Registered users can organize documents, edit the same document concurrently, create and restore explicit revision checkpoints, share documents directly with other registered accounts, and publish revocable read-only links to the current saved revision. Tokenized invitations for unregistered email recipients remain planned.
 
 ## MVP At A Glance
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- Rendered-in-place Milkdown/Yjs editing with explicit Save states (migration in progress)
+- Rendered-in-place Milkdown/Yjs editing with rich formatting, Undo/Redo, full-screen mode, and explicit Save states
 - Immutable revision snapshots with history and restore
 - Direct document sharing with `owner`, `editor`, or `viewer` access
 - Owner-managed, revocable public links to the current saved revision

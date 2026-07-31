@@ -73,11 +73,12 @@ Real-time work must not weaken explicit snapshots, auditability, revocation, or 
 
 ## Phase 7: Rendered-In-Place Collaborative Editing
 
-- Replace the split CodeMirror/Vditor live canvas with Milkdown as the sole writable rendered Markdown surface. In progress.
+- Replace the split CodeMirror/Vditor live canvas with Milkdown as the sole writable rendered Markdown surface. Complete.
 - Introduce versioned collaboration-state formats and editor protocol negotiation.
 - Add a pinned server/client Markdown codec for Milkdown's Yjs `XmlFragment`.
 - Convert legacy rooms atomically while preserving unsaved shared drafts and incrementing room generation.
 - Keep Vditor only for sanitized immutable history and public-document rendering.
+- Add discoverable rich-formatting controls, visible Yjs-aware Undo/Redo, and a full-screen layout that preserves the mounted collaborative editor. In progress.
 - Gate conversion on a supported-Markdown round-trip corpus and leave lossy documents on the legacy editor.
 - Add two-browser tests for convergence, awareness, collaborative undo, checkpoint, restore, reconnect, revocation, read-only mode, IME, and mobile layout.
 
