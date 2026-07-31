@@ -91,15 +91,18 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const effectivePermission = permission ?? documentQuery.data?.permission;
   const readOnly = effectivePermission === 'viewer';
 
-  const applyCheckpoint = async (checkpoint: CollaborationCheckpointEvent) => {
+  const applyCheckpoint = async (
+    checkpoint: CollaborationCheckpointEvent,
+    acknowledgedContent?: string,
+  ) => {
     const currentContent = editorRef.current?.getContent() ?? '';
-    const matches = await contentMatchesHash(
-      currentContent,
-      checkpoint.contentHash,
-    );
+    const savedContent = acknowledgedContent ?? currentContent;
+    const matches =
+      acknowledgedContent !== undefined ||
+      (await contentMatchesHash(currentContent, checkpoint.contentHash));
     if (matches) {
-      savedContentRef.current = currentContent;
-      setDirty(editorRef.current?.getContent() !== currentContent);
+      savedContentRef.current = savedContent;
+      setDirty(editorRef.current?.getContent() !== savedContent);
       queryClient.setQueryData<DocumentContentResponse>(
         ['documents', documentId],
         (current) =>
@@ -107,7 +110,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             ? current
             : {
                 ...current,
-                content: currentContent,
+                content: savedContent,
                 currentRevision: {
                   id: checkpoint.id,
                   ordinal: checkpoint.ordinal,
@@ -153,9 +156,11 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         };
       }
       await editor.prepareCheckpoint();
+      const acknowledgedContent = editor.getContent();
       return {
         mode: 'collaborative' as const,
         result: await checkpointCollaboration(documentId, saveMessage),
+        acknowledgedContent,
       };
     },
     onSuccess: async (saveResult) => {
@@ -191,6 +196,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
           ...saveResult.result.currentRevision,
           contentHash: saveResult.result.contentHash,
         }),
+        saveResult.acknowledgedContent,
       );
     },
     onError: (error) => setNotice(messageFor(error)),

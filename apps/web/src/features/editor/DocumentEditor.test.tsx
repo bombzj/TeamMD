@@ -192,7 +192,7 @@ describe('DocumentEditor', () => {
         return Promise.resolve(
           jsonResponse({
             documentId,
-            contentHash: sha256(updatedContent),
+            contentHash: sha256('# Canonical server serialization\n'),
             currentRevision: nextRevisionSummary,
           }),
         );
