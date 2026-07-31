@@ -1,5 +1,7 @@
 import { Crepe, type CrepeConfig } from '@milkdown/crepe';
 
+import { createMermaidPreviewRenderer } from './mermaid-preview.js';
+
 const topBarControlNames = [
   'Text style',
   'Bold',
@@ -50,15 +52,23 @@ export function createTeamMdEditor(
   root: HTMLElement,
   defaultValue?: string,
 ): Crepe {
+  const mermaidPreview = createMermaidPreviewRenderer();
   const editor = new Crepe({
     root,
     features: editorFeatureProfile,
+    featureConfigs: {
+      [Crepe.Feature.CodeMirror]: {
+        previewLabel: 'Diagram preview',
+        renderPreview: mermaidPreview.renderPreview,
+      },
+    },
     ...(defaultValue === undefined ? {} : { defaultValue }),
   });
   const disconnectAccessibility = enhanceEditorAccessibility(root);
   const destroy = editor.destroy.bind(editor);
   editor.destroy = async () => {
     disconnectAccessibility();
+    mermaidPreview.destroy();
     return await destroy();
   };
   return editor;

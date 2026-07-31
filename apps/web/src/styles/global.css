@@ -1268,6 +1268,26 @@ body.editor-full-screen-open {
   color: var(--ink);
   background: #9bc9e9;
 }
+.milkdown-host .milkdown-code-block .preview-panel .preview {
+  overflow: auto;
+  max-width: 100%;
+}
+.milkdown-host .milkdown-code-block .preview-panel svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.milkdown-host .mermaid-preview-error {
+  border-left: 3px solid var(--red);
+  padding: 12px 14px;
+  color: var(--red-dark);
+  background: rgba(168, 60, 50, 0.08);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
 .milkdown-host .ProseMirror-yjs-cursor {
   position: relative;
   z-index: 2;

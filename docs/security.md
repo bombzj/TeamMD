@@ -55,12 +55,14 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Pin and audit Vditor behavior when upgrading; add sanitization regression fixtures.
 - Treat Milkdown/ProseMirror document content, links, images, code, and plugin attributes as untrusted. Disable raw HTML and unsafe URL schemes in the writable schema, and never persist rendered HTML as a revision.
 - Serialize collaborative checkpoints to Markdown on the trusted server using the same pinned schema version as the client. Reject malformed or unsupported structured state rather than accepting client-supplied Markdown projections.
+- Treat Mermaid source and generated SVG as untrusted. Initialize Mermaid with strict security and HTML labels disabled, render only exact `mermaid` fences, sanitize SVG again with links, scripts, HTML integration points, event/style attributes, and style elements forbidden, and never persist generated output.
 
 ## Input And Abuse Limits
 
 Initial proposals, configurable after measurement:
 
 - Markdown content: 2 MiB UTF-8 per save
+- Mermaid preview source: 64 KiB UTF-8 and 500 nonblank lines per diagram, one render at a time per editor, and a 3-second result timeout
 - Filename/folder name: 255 Unicode characters after normalization checks
 - Save message: 500 characters
 - Public-link token: exactly 43 URL-safe base64 characters

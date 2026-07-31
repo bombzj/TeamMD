@@ -8,7 +8,7 @@ The repository includes a runnable React application, shared Zod contracts, a Fa
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- Rendered-in-place Milkdown/Yjs editing with rich formatting, Undo/Redo, full-screen mode, and explicit Save states
+- Rendered-in-place Milkdown/Yjs editing with rich formatting, Undo/Redo, full-screen mode, bounded Mermaid previews, and explicit Save states
 - Immutable revision snapshots with history and restore
 - Direct document sharing with `owner`, `editor`, or `viewer` access
 - Owner-managed, revocable public links to the current saved revision
@@ -21,15 +21,15 @@ Transient network interruptions are handled by Hocuspocus reconnect and durable 
 
 ## Stack
 
-| Area          | Choice                                                       |
-| ------------- | ------------------------------------------------------------ |
-| Web           | React 19, Vite, TypeScript, Milkdown, Vditor, TanStack Query |
-| Collaboration | Yjs, Hocuspocus, Milkdown collaboration plugin               |
-| API           | Node.js 22 LTS, Fastify, TypeScript, Zod                     |
-| Data          | MySQL 8.4, Prisma migrations                                 |
-| Auth          | Argon2id, opaque cookie sessions, CSRF protection            |
-| Tests         | Vitest and Fastify injection                                 |
-| Workspace     | pnpm monorepo                                                |
+| Area          | Choice                                                |
+| ------------- | ----------------------------------------------------- |
+| Web           | React 19, Vite, TypeScript, Milkdown, Mermaid, Vditor |
+| Collaboration | Yjs, Hocuspocus, Milkdown collaboration plugin        |
+| API           | Node.js 22 LTS, Fastify, TypeScript, Zod              |
+| Data          | MySQL 8.4, Prisma migrations                          |
+| Auth          | Argon2id, opaque cookie sessions, CSRF protection     |
+| Tests         | Vitest and Fastify injection                          |
+| Workspace     | pnpm monorepo                                         |
 
 ## Repository Layout
 

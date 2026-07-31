@@ -8,7 +8,7 @@ Make TeamMD's Milkdown editor feel complete for everyday Markdown authoring whil
 
 Crepe already enables these features by default in both collaborative and standalone modes: selection toolbar, slash/block editing, headings, bold, emphasis, strikethrough, links, bullet and ordered lists, task lists, blockquotes, tables, fenced code blocks with CodeMirror, placeholders, and cursor support. TeamMD explicitly enables Crepe's top bar and disables AI, image blocks, and LaTeX.
 
-The current gaps are discoverability, duplicated editor configuration, insufficient feature-level tests, no Mermaid rendering, and no explicit compatibility gate for changing the Milkdown schema or feature profile.
+The current editor prototype renders exact `mermaid` fences through Crepe's existing code preview while keeping fenced source authoritative. Remaining gaps are the two-client collaboration/source-preservation gate, static history/public rendering, and rollout compatibility and performance gates.
 
 ## Product Requirements
 
@@ -75,12 +75,12 @@ The current gaps are discoverability, duplicated editor configuration, insuffici
 
 ### Phase 3: Mermaid Rendering Prototype
 
-- Add pinned `mermaid` and SVG sanitization dependencies.
-- Detect fenced code nodes whose language is exactly `mermaid`.
-- Implement a Milkdown/ProseMirror node view or decoration that keeps the code node authoritative and renders a sibling/overlay preview.
-- Provide source/preview modes without replacing the underlying ProseMirror node.
-- Debounce rendering, cancel stale work, and display bounded syntax errors locally.
-- Add unit tests for valid diagrams, invalid source, rapid updates, unmount cancellation, read-only mode, and source preservation.
+- Add pinned `mermaid` and SVG sanitization dependencies. Complete.
+- Detect fenced code nodes whose language is exactly `mermaid`. Complete.
+- Use Crepe's fenced-code preview hook to keep the code node authoritative and render disposable sanitized SVG. Complete.
+- Provide source/preview modes without replacing the underlying ProseMirror node. Complete.
+- Debounce and serialize rendering, ignore work after teardown, and display bounded syntax errors locally. Complete.
+- Add unit tests for valid diagrams, invalid source, rapid updates, teardown cancellation, limits, sanitization, source preservation, read-only mode, and collaborative convergence. Complete for the editor prototype.
 
 **Exit gate:** two collaborative clients can edit Mermaid source and converge while previews update independently; generated SVG never enters Markdown or Yjs state.
 
@@ -134,8 +134,8 @@ The current gaps are discoverability, duplicated editor configuration, insuffici
 - [x] Phase 2: Correct code-language picker search, clear-action, and option semantics.
 - [x] Phase 2: Add full-screen editor mode with Escape and state-preservation tests.
 - [x] Phase 2: Add visible Yjs-aware undo and redo controls.
-- [ ] Phase 3: Add secure Mermaid renderer dependencies and limits.
-- [ ] Phase 3: Implement fenced-code Mermaid preview node view/decorations.
-- [ ] Phase 3: Add collaboration and source-preservation tests.
+- [x] Phase 3: Add secure Mermaid renderer dependencies and limits.
+- [x] Phase 3: Implement fenced-code Mermaid preview through Crepe's source-preserving preview hook.
+- [x] Phase 3: Add collaboration and source-preservation tests.
 - [ ] Phase 4: Add strict Mermaid rendering to history/public previews.
 - [ ] Phase 5: Complete compatibility, security, performance, and visual gates.

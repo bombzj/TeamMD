@@ -12,6 +12,10 @@ describe('collaborative editor rendering', () => {
       resolve(process.cwd(), 'src/features/editor/collaborative-editor.ts'),
       'utf8',
     );
+    const featureProfileSource = await readFile(
+      resolve(process.cwd(), 'src/features/editor/editor-feature-profile.ts'),
+      'utf8',
+    );
     const mainSource = await readFile(
       resolve(process.cwd(), 'src/main.tsx'),
       'utf8',
@@ -19,6 +23,10 @@ describe('collaborative editor rendering', () => {
 
     expect(editorSource).toContain("getXmlFragment('milkdown')");
     expect(editorSource).toContain('.bindXmlFragment(');
+    expect(editorSource).not.toContain('mermaid');
+    expect(featureProfileSource).toContain(
+      'renderPreview: mermaidPreview.renderPreview',
+    );
     expect(mainSource).toContain(
       "import '@milkdown/crepe/theme/common/style.css';",
     );

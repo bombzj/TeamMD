@@ -79,6 +79,7 @@ Real-time work must not weaken explicit snapshots, auditability, revocation, or 
 - Convert legacy rooms atomically while preserving unsaved shared drafts and incrementing room generation.
 - Keep Vditor only for sanitized immutable history and public-document rendering.
 - Add discoverable rich-formatting controls, visible Yjs-aware Undo/Redo, and a full-screen layout that preserves the mounted collaborative editor. In progress.
+- Derive strict, bounded Mermaid SVG previews from authoritative fenced Markdown in the editor without changing the schema or collaboration-state format. Editor prototype and two-client source-convergence gate complete; static history/public rendering remains.
 - Gate conversion on a supported-Markdown round-trip corpus and leave lossy documents on the legacy editor.
 - Add two-browser tests for convergence, awareness, collaborative undo, checkpoint, restore, reconnect, revocation, read-only mode, IME, and mobile layout.
 

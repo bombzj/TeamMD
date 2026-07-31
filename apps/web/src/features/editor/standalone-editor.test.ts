@@ -52,6 +52,11 @@ This has **bold**, *italic*, ~~deleted~~, and \`inline code\`.
 \`\`\`typescript
 const ready = true;
 \`\`\`
+
+\`\`\`mermaid
+graph TD
+  Source --> Preview
+\`\`\`
 `;
 
 const mountedEditors: Array<{ destroy: () => void }> = [];
@@ -79,6 +84,10 @@ describe('standalone editor rich features', () => {
     expect(host.querySelector('table')).not.toBeNull();
     expect(editor.getContent()).toContain('```typescript');
     expect(editor.getContent()).toContain('const ready = true;');
+    expect(editor.getContent()).toContain(
+      '```mermaid\ngraph TD\n  Source --> Preview\n```',
+    );
+    expect(editor.getContent()).not.toContain('<svg');
     await waitFor(() => {
       expect(
         host.querySelector('button[aria-label="Bold"]')?.getAttribute('title'),
@@ -124,6 +133,8 @@ describe('standalone editor rich features', () => {
     expect(
       host.querySelector('.ProseMirror')?.getAttribute('contenteditable'),
     ).toBe('false');
+    expect(editor.getContent()).toContain('```mermaid');
+    expect(editor.getContent()).not.toContain('<svg');
     expect(host.querySelector('.milkdown-top-bar button')).toBeNull();
     expect(
       host.querySelector('.milkdown-toolbar')?.getAttribute('data-show'),

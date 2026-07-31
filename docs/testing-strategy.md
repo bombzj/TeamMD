@@ -41,6 +41,7 @@ Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not 
 - rendered Markdown is directly editable without a second live preview, while Vditor remains read-only for static history/public content;
 - read-only mode, IME composition, visible Undo/Redo through the active Yjs or ProseMirror history, clipboard Markdown, tables, code blocks, links, and narrow viewports remain stable;
 - rich editor controls expose names and tooltips, pointer-driven block/link actions and code-language search receive semantic keyboard activation and visible focus, language entries use listbox option semantics, and mutation controls stay hidden from viewers;
+- exact Mermaid-fence detection, source and line limits, strict SVG sanitization, bounded errors, serialized rapid updates, render timeout, teardown cancellation, source/preview toggling, and source-preserving Markdown serialization;
 - full-screen entry and Escape/visible-control exit preserve the mounted Milkdown/Yjs editor, unsaved draft, transport state, and body scroll cleanup;
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
 - background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;
@@ -63,6 +64,7 @@ Use Playwright against built web/API applications and isolated MySQL data. Criti
 7. Viewer can read but cannot mutate through UI or direct request.
 8. Trash and restore a folder subtree; permanently delete with confirmation.
 9. Create a public link, open it in an isolated anonymous context, verify only the current saved revision, rotate/revoke it, and verify the old token becomes generically unavailable.
+10. Add and concurrently edit a Mermaid fence, verify both clients converge on identical source, checkpoint it, and confirm editor, history, and public previews derive sanitized diagrams without persisting SVG.
 
 Run Chromium on every pull request and add Firefox/WebKit in scheduled or release workflows. Include desktop and narrow mobile viewport checks even though native mobile is out of scope.
 

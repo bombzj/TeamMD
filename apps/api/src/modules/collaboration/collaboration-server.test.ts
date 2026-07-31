@@ -166,7 +166,13 @@ describe('collaboration gateway', () => {
     const codec = await getMilkdownCodec();
     const service = new InMemoryCollaborationService();
     service.stateFormat = 'milkdown-xml-v1';
-    service.state = codec.createState('# Structured room\n');
+    service.state = codec.createState(`# Structured room
+
+\`\`\`mermaid
+flowchart LR
+  Source --> Preview
+\`\`\`
+`);
     const server = createCollaborationServer(
       config,
       service as unknown as CollaborationService,
@@ -182,14 +188,26 @@ describe('collaboration gateway', () => {
       ]);
       const fragmentA = writerA.document.getXmlFragment('milkdown');
       const fragmentB = writerB.document.getXmlFragment('milkdown');
-      const paragraph = new Y.XmlElement('paragraph');
-      paragraph.insert(0, [new Y.XmlText('Shared paragraph')]);
-      fragmentA.insert(fragmentA.length, [paragraph]);
-      await waitForXmlLength(
-        fragmentB,
-        fragmentA.length,
-        'structured convergence',
-      );
+      const sourceA = getMermaidSource(fragmentA);
+      const sourceB = getMermaidSource(fragmentB);
+      sourceA.insert(sourceA.length, '\n  Preview --> WriterA');
+      sourceB.insert(sourceB.length, '\n  Preview --> WriterB');
+      await Promise.all([
+        waitForXml(
+          fragmentA,
+          () => hasBothMermaidEdits(sourceA.toJSON()),
+          'writer A Mermaid convergence',
+        ),
+        waitForXml(
+          fragmentB,
+          () => hasBothMermaidEdits(sourceB.toJSON()),
+          'writer B Mermaid convergence',
+        ),
+      ]);
+      const convergedMarkdown = codec.read(writerA.document);
+      expect(codec.read(writerB.document)).toBe(convergedMarkdown);
+      expect(convergedMarkdown).toContain('```mermaid');
+      expect(convergedMarkdown).not.toContain('<svg');
 
       server.hocuspocus.flushPendingStores();
       await server.hocuspocus
@@ -197,7 +215,8 @@ describe('collaboration gateway', () => {
         .then(async (connection) => connection.disconnect());
       const restored = new Y.Doc();
       Y.applyUpdate(restored, service.state);
-      expect(codec.read(restored)).toContain('Shared paragraph');
+      expect(codec.read(restored)).toBe(convergedMarkdown);
+      expect(codec.read(restored)).not.toContain('<svg');
       expect(restored.getText('content').length).toBe(0);
       restored.destroy();
     } finally {
@@ -249,20 +268,36 @@ function waitForDocument(
   });
 }
 
-function waitForXmlLength(
+function waitForXml(
   fragment: Y.XmlFragment,
-  length: number,
+  predicate: () => boolean,
   label: string,
 ): Promise<void> {
-  if (fragment.length === length) return Promise.resolve();
+  if (predicate()) return Promise.resolve();
   return withTimeout<void>(label, (resolve) => {
     const handleUpdate = () => {
-      if (fragment.length !== length) return;
-      fragment.unobserve(handleUpdate);
+      if (!predicate()) return;
+      fragment.unobserveDeep(handleUpdate);
       resolve();
     };
-    fragment.observe(handleUpdate);
+    fragment.observeDeep(handleUpdate);
   });
+}
+
+function getMermaidSource(fragment: Y.XmlFragment): Y.XmlText {
+  const codeBlock = fragment
+    .toArray()
+    .find(
+      (node): node is Y.XmlElement =>
+        node instanceof Y.XmlElement &&
+        node.nodeName === 'code_block' &&
+        node.getAttribute('language') === 'mermaid',
+    );
+  const source = codeBlock?.toArray()[0];
+  if (!(source instanceof Y.XmlText)) {
+    throw new Error('Mermaid source was not stored as Y.XmlText.');
+  }
+  return source;
 }
 
 function waitForAwareness(
@@ -335,6 +370,13 @@ function withTimeout<T>(
 
 function hasBothWriterEdits(content: string): boolean {
   return content.includes('Alpha ') && content.includes('Beta ');
+}
+
+function hasBothMermaidEdits(content: string): boolean {
+  return (
+    content.includes('Preview --> WriterA') &&
+    content.includes('Preview --> WriterB')
+  );
 }
 
 function emptyState(): Uint8Array {

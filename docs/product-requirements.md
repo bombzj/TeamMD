@@ -52,6 +52,7 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-012:** An authorized user can expand the complete document editor into a distraction-free full-screen layout and exit with the visible control or Escape without recreating the editor, losing draft state, or disconnecting collaboration.
 - **REQ-EDIT-013:** Owners and editors have visible Undo and Redo controls that invoke the active editor history. Collaborative rooms use the client-local Yjs undo manager, standalone fallback uses ProseMirror history, and viewers receive no mutation controls.
 - **REQ-EDIT-014:** Rich editor actions expose accessible names, visible keyboard focus, and keyboard activation even when the underlying Milkdown control is pointer-driven. Read-only viewers do not receive mutation controls.
+- **REQ-EDIT-015:** A fenced code block whose language is exactly `mermaid` can show a disposable diagram preview while its original fence remains the only editable, collaborative, saved, and exported representation. Invalid or oversized diagrams retain editable source and show a bounded local error instead of changing document content.
 
 ### Sharing
 
