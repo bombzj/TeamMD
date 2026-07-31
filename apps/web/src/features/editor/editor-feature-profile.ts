@@ -114,6 +114,32 @@ export function enhanceEditorAccessibility(root: HTMLElement): () => void {
       ),
       'Toggle code preview',
     );
+    labelPointerControl(
+      root.querySelector<HTMLElement>(
+        '.milkdown-block-handle .operation-item:first-child',
+      ),
+      'Add block',
+    );
+    labelPointerControl(
+      root.querySelector<HTMLElement>('.milkdown-link-preview .link-icon'),
+      'Copy link',
+    );
+    labelPointerControl(
+      root.querySelector<HTMLElement>(
+        '.milkdown-link-preview .link-edit-button',
+      ),
+      'Edit link',
+    );
+    labelPointerControl(
+      root.querySelector<HTMLElement>(
+        '.milkdown-link-preview .link-remove-button',
+      ),
+      'Remove link',
+    );
+    labelPointerControl(
+      root.querySelector<HTMLElement>('.milkdown-link-edit .confirm'),
+      'Confirm link',
+    );
   };
   const observer = new MutationObserver(enhance);
   observer.observe(root, { childList: true, subtree: true });
@@ -141,10 +167,33 @@ function labelNativeControl(control: HTMLButtonElement | null, name: string) {
   control.title = name;
 }
 
+function labelPointerControl(control: HTMLElement | null, name: string) {
+  if (control === null) return;
+  control.setAttribute('role', 'button');
+  control.tabIndex = 0;
+  control.setAttribute('aria-label', name);
+  control.title = name;
+  if (control.dataset.keyboardActivation === 'true') return;
+  control.dataset.keyboardActivation = 'true';
+  control.addEventListener('keydown', activatePointerControlWithKeyboard);
+}
+
 function activateWithKeyboard(event: KeyboardEvent) {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   event.preventDefault();
   event.currentTarget?.dispatchEvent(
     new Event('pointerdown', { bubbles: true, cancelable: true }),
+  );
+}
+
+function activatePointerControlWithKeyboard(event: KeyboardEvent) {
+  if ((event.key !== 'Enter' && event.key !== ' ') || event.repeat) return;
+  event.preventDefault();
+  const control = event.currentTarget;
+  control?.dispatchEvent(
+    new Event('pointerdown', { bubbles: true, cancelable: true }),
+  );
+  control?.dispatchEvent(
+    new Event('pointerup', { bubbles: true, cancelable: true }),
   );
 }

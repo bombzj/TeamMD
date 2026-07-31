@@ -51,6 +51,7 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-011:** If collaboration cannot initialize, an authorized user can edit the current saved revision without presence or live merging and save through the stale-base whole-document endpoint. The UI clearly identifies this degraded mode and does not claim offline-first behavior.
 - **REQ-EDIT-012:** An authorized user can expand the complete document editor into a distraction-free full-screen layout and exit with the visible control or Escape without recreating the editor, losing draft state, or disconnecting collaboration.
 - **REQ-EDIT-013:** Owners and editors have visible Undo and Redo controls that invoke the active editor history. Collaborative rooms use the client-local Yjs undo manager, standalone fallback uses ProseMirror history, and viewers receive no mutation controls.
+- **REQ-EDIT-014:** Rich editor actions expose accessible names, visible keyboard focus, and keyboard activation even when the underlying Milkdown control is pointer-driven. Read-only viewers do not receive mutation controls.
 
 ### Sharing
 

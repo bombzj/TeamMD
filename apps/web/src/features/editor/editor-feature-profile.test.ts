@@ -87,4 +87,49 @@ describe('editor feature profile', () => {
 
     disconnect();
   });
+
+  it('makes block and link actions semantic keyboard controls', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="milkdown-block-handle">
+        <div class="operation-item"></div>
+        <div class="operation-item"></div>
+      </div>
+      <div class="milkdown-link-preview">
+        <span class="link-icon"></span>
+        <span class="link-edit-button"></span>
+        <span class="link-remove-button"></span>
+      </div>
+      <div class="milkdown-link-edit">
+        <span class="confirm"></span>
+      </div>
+    `;
+    const pointerEvents = vi.fn();
+    root.addEventListener('pointerdown', pointerEvents);
+    root.addEventListener('pointerup', pointerEvents);
+
+    const disconnect = enhanceEditorAccessibility(root);
+    const controls = root.querySelectorAll<HTMLElement>('[role="button"]');
+
+    expect([...controls].map((control) => control.ariaLabel)).toEqual([
+      'Add block',
+      'Copy link',
+      'Edit link',
+      'Remove link',
+      'Confirm link',
+    ]);
+    expect([...controls].map((control) => control.tabIndex)).toEqual([
+      0, 0, 0, 0, 0,
+    ]);
+
+    controls[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }),
+    );
+    controls[1]?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: ' ' }),
+    );
+    expect(pointerEvents).toHaveBeenCalledTimes(4);
+
+    disconnect();
+  });
 });

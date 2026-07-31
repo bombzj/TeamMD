@@ -96,6 +96,9 @@ describe('standalone editor rich features', () => {
     expect(
       host.querySelector('button[aria-label="Add column"]'),
     ).not.toBeNull();
+    expect(
+      host.querySelector('[role="button"][aria-label="Add block"]'),
+    ).not.toBeNull();
 
     const boldButton = host.querySelector<HTMLButtonElement>(
       '.milkdown-top-bar button[aria-label="Bold"]',
