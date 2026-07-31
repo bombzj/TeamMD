@@ -40,7 +40,7 @@ Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not 
 - awareness changes update participant count and trusted ephemeral cursor/selection identity;
 - rendered Markdown is directly editable without a second live preview, while Vditor remains read-only for static history/public content;
 - read-only mode, IME composition, visible Undo/Redo through the active Yjs or ProseMirror history, clipboard Markdown, tables, code blocks, links, and narrow viewports remain stable;
-- rich editor controls expose names and tooltips, pointer-driven block/link actions receive semantic keyboard activation and visible focus, and mutation controls stay hidden from viewers;
+- rich editor controls expose names and tooltips, pointer-driven block/link actions and code-language search receive semantic keyboard activation and visible focus, language entries use listbox option semantics, and mutation controls stay hidden from viewers;
 - full-screen entry and Escape/visible-control exit preserve the mounted Milkdown/Yjs editor, unsaved draft, transport state, and body scroll cleanup;
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
 - background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;

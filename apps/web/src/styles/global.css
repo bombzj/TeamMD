@@ -1246,6 +1246,7 @@ body.editor-full-screen-open {
 .milkdown-host .milkdown-block-handle .operation-item:focus-visible,
 .milkdown-host .milkdown-link-preview [role='button']:focus-visible,
 .milkdown-host .milkdown-link-edit [role='button']:focus-visible,
+.milkdown-host .milkdown-code-block [role='button']:focus-visible,
 .milkdown-host .milkdown-top-bar button:focus-visible,
 .milkdown-host .milkdown-table-block button:focus-visible,
 .milkdown-host .milkdown-code-block button:focus-visible {

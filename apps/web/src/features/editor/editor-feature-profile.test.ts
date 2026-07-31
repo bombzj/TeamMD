@@ -132,4 +132,43 @@ describe('editor feature profile', () => {
 
     disconnect();
   });
+
+  it('makes the code language picker accessible by keyboard', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="milkdown-code-block">
+        <div class="language-picker">
+          <input class="search-input" />
+          <div class="clear-icon"></div>
+          <ul class="language-list" role="listbox">
+            <li class="language-list-item" role="listitem" tabindex="0" data-language="typescript">
+              TypeScript
+            </li>
+          </ul>
+        </div>
+      </div>
+    `;
+    const clear = root.querySelector<HTMLElement>('.clear-icon');
+    const mouseDown = vi.fn();
+    clear?.addEventListener('mousedown', mouseDown);
+
+    const disconnect = enhanceEditorAccessibility(root);
+
+    expect(
+      root.querySelector('.search-input')?.getAttribute('aria-label'),
+    ).toBe('Search code languages');
+    expect(clear?.getAttribute('role')).toBe('button');
+    expect(clear?.getAttribute('aria-label')).toBe('Clear language search');
+    expect(clear?.tabIndex).toBe(0);
+    expect(
+      root.querySelector('.language-list-item')?.getAttribute('role'),
+    ).toBe('option');
+
+    clear?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }),
+    );
+    expect(mouseDown).toHaveBeenCalledOnce();
+
+    disconnect();
+  });
 });

@@ -131,6 +131,7 @@ The current gaps are discoverability, duplicated editor configuration, insuffici
 - [x] Phase 1: Extend codec round-trip corpus with Mermaid fences and rich constructs.
 - [ ] Phase 2: Audit and test rich controls and accessibility.
 - [x] Phase 2: Add semantic keyboard support for pointer-driven block and link actions.
+- [x] Phase 2: Correct code-language picker search, clear-action, and option semantics.
 - [x] Phase 2: Add full-screen editor mode with Escape and state-preservation tests.
 - [x] Phase 2: Add visible Yjs-aware undo and redo controls.
 - [ ] Phase 3: Add secure Mermaid renderer dependencies and limits.

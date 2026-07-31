@@ -140,6 +140,23 @@ export function enhanceEditorAccessibility(root: HTMLElement): () => void {
       root.querySelector<HTMLElement>('.milkdown-link-edit .confirm'),
       'Confirm link',
     );
+    labelNativeControl(
+      root.querySelector<HTMLInputElement>(
+        '.milkdown-code-block .language-picker .search-input',
+      ),
+      'Search code languages',
+    );
+    labelMouseControl(
+      root.querySelector<HTMLElement>(
+        '.milkdown-code-block .language-picker .clear-icon',
+      ),
+      'Clear language search',
+    );
+    root
+      .querySelectorAll<HTMLElement>(
+        '.milkdown-code-block .language-picker .language-list-item[data-language]',
+      )
+      .forEach((option) => option.setAttribute('role', 'option'));
   };
   const observer = new MutationObserver(enhance);
   observer.observe(root, { childList: true, subtree: true });
@@ -161,7 +178,10 @@ function labelControls(
   });
 }
 
-function labelNativeControl(control: HTMLButtonElement | null, name: string) {
+function labelNativeControl(
+  control: HTMLButtonElement | HTMLInputElement | null,
+  name: string,
+) {
   if (control === null) return;
   control.setAttribute('aria-label', name);
   control.title = name;
@@ -176,6 +196,17 @@ function labelPointerControl(control: HTMLElement | null, name: string) {
   if (control.dataset.keyboardActivation === 'true') return;
   control.dataset.keyboardActivation = 'true';
   control.addEventListener('keydown', activatePointerControlWithKeyboard);
+}
+
+function labelMouseControl(control: HTMLElement | null, name: string) {
+  if (control === null) return;
+  control.setAttribute('role', 'button');
+  control.tabIndex = 0;
+  control.setAttribute('aria-label', name);
+  control.title = name;
+  if (control.dataset.keyboardActivation === 'true') return;
+  control.dataset.keyboardActivation = 'true';
+  control.addEventListener('keydown', activateMouseControlWithKeyboard);
 }
 
 function activateWithKeyboard(event: KeyboardEvent) {
@@ -195,5 +226,13 @@ function activatePointerControlWithKeyboard(event: KeyboardEvent) {
   );
   control?.dispatchEvent(
     new Event('pointerup', { bubbles: true, cancelable: true }),
+  );
+}
+
+function activateMouseControlWithKeyboard(event: KeyboardEvent) {
+  if ((event.key !== 'Enter' && event.key !== ' ') || event.repeat) return;
+  event.preventDefault();
+  event.currentTarget?.dispatchEvent(
+    new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
   );
 }
