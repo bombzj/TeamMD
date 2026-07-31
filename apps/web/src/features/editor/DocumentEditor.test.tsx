@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const collaboration = vi.hoisted(() => ({
   content: '',
   creationCount: 0,
+  creationError: null as Error | null,
   options: null as null | {
     onContentChange: (content: string) => void;
     onRestore: () => void;
@@ -27,6 +28,9 @@ type MockEditorOptions = {
 
 vi.mock('./collaborative-editor.js', () => ({
   createCollaborativeEditor: vi.fn((options: MockEditorOptions) => {
+    if (collaboration.creationError !== null) {
+      return Promise.reject(collaboration.creationError);
+    }
     collaboration.creationCount += 1;
     if (collaboration.content.length === 0) {
       collaboration.content = documentResponse.content;
@@ -40,6 +44,26 @@ vi.mock('./collaborative-editor.js', () => ({
       prepareCheckpoint: collaboration.prepareCheckpoint,
     });
   }),
+}));
+
+vi.mock('./standalone-editor.js', () => ({
+  createStandaloneEditor: vi.fn(
+    (options: { onContentChange: (content: string) => void }) => {
+      collaboration.content = documentResponse.content;
+      collaboration.options = {
+        onContentChange: options.onContentChange,
+        onRestore: vi.fn(),
+        onPermissionChange: vi.fn(),
+        onPresenceChange: vi.fn(),
+        onTransportChange: vi.fn(),
+      };
+      return Promise.resolve({
+        destroy: vi.fn(),
+        getContent: () => collaboration.content,
+        prepareCheckpoint: collaboration.prepareCheckpoint,
+      });
+    },
+  ),
 }));
 
 vi.mock('./MarkdownPreview.js', () => ({
@@ -70,6 +94,7 @@ afterEach(() => {
   cleanup();
   collaboration.content = '';
   collaboration.creationCount = 0;
+  collaboration.creationError = null;
   collaboration.options = null;
   collaboration.prepareCheckpoint.mockClear();
   vi.unstubAllGlobals();
@@ -77,6 +102,56 @@ afterEach(() => {
 });
 
 describe('DocumentEditor', () => {
+  it('falls back to revision editing and legacy save without collaboration', async () => {
+    collaboration.creationError = new Error('Collaboration unavailable');
+    const updatedContent = '# Updated without collaboration\n';
+    const nextRevision = {
+      id: 'cm1234567890revisionoffline',
+      ordinal: 2,
+      createdAt: '2026-07-31T00:00:00.000Z',
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url === `/api/v1/documents/${documentId}`) {
+        return Promise.resolve(jsonResponse(documentResponse));
+      }
+      if (url.endsWith('/content')) {
+        return Promise.resolve(
+          jsonResponse({ documentId, currentRevision: nextRevision }),
+        );
+      }
+      return Promise.reject(
+        new Error(`Unexpected request: ${url} ${String(init?.method)}`),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderEditor();
+
+    expect(await screen.findByText('Collaboration off')).toBeTruthy();
+    act(() => {
+      collaboration.content = updatedContent;
+      collaboration.options?.onContentChange(updatedContent);
+    });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/documents/${documentId}/content`,
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          baseRevisionId: documentResponse.currentRevision.id,
+          content: updatedContent,
+        }),
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/collaboration-checkpoint'),
+      expect.anything(),
+    );
+    expect(await screen.findAllByText('Revision 2')).toHaveLength(2);
+  });
+
   it('checkpoints the authoritative room without sending client Markdown', async () => {
     const updatedContent = '# Updated together\n';
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

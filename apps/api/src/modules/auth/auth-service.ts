@@ -4,7 +4,6 @@ import type {
   UserDto,
 } from '@teammd/contracts';
 import { Prisma, type PrismaClient, type User } from '@prisma/client';
-import argon2 from 'argon2';
 
 import { ApiError } from '../../lib/api-error.js';
 import {
@@ -13,13 +12,7 @@ import {
   tokenMatches,
 } from '../../lib/tokens.js';
 import type { AuthenticatedSession, SessionContext } from './auth-types.js';
-
-const passwordOptions = {
-  type: argon2.argon2id,
-  memoryCost: 19 * 1024,
-  timeCost: 2,
-  parallelism: 1,
-} as const;
+import { hashPassword, passwordMatches } from './password-hasher.js';
 
 export type CreatedSession = AuthResponse & {
   sessionToken: string;
@@ -38,7 +31,7 @@ export class AuthService {
     requestId: string,
   ): Promise<CreatedSession> {
     const normalizedEmail = normalizeEmail(email);
-    const passwordHash = await argon2.hash(password, passwordOptions);
+    const passwordHash = await hashPassword(password);
 
     try {
       return await this.prisma.$transaction(async (transaction) => {
@@ -83,7 +76,7 @@ export class AuthService {
     const valid =
       user !== null &&
       user.disabledAt === null &&
-      (await argon2.verify(user.passwordHash, password));
+      (await passwordMatches(user.passwordHash, password));
 
     if (!valid || user === null) {
       throw new ApiError(

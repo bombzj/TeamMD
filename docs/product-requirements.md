@@ -48,6 +48,7 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-008:** The collaborative editor stores structured operational state in a versioned Yjs `XmlFragment`, while every immutable revision remains canonical portable Markdown serialized by the server.
 - **REQ-EDIT-009:** Migrating an existing collaborative room preserves its complete shared draft, increments the room generation, and rejects incompatible editor protocols. Migration never rewrites existing immutable revisions.
 - **REQ-EDIT-010:** Supported Markdown constructs round-trip through the rendered editor without semantic loss. Documents containing unsupported or lossy syntax remain on the legacy source editor until the user can resolve the incompatibility explicitly.
+- **REQ-EDIT-011:** If collaboration cannot initialize, an authorized user can edit the current saved revision without presence or live merging and save through the stale-base whole-document endpoint. The UI clearly identifies this degraded mode and does not claim offline-first behavior.
 
 ### Sharing
 

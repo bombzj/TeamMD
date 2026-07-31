@@ -42,7 +42,7 @@ Dependency direction is one way:
 2. Every successful content save creates an immutable `DocumentRevision` and advances the document head atomically.
 3. A save includes `baseRevisionId`. If it is not the current head, return `409 REVISION_CONFLICT`; never silently overwrite newer content.
 4. Reverting history creates a new revision copied from the selected revision. Existing history is never changed.
-5. Passwords use Argon2id. Sessions use opaque, revocable tokens stored hashed at rest and delivered in secure HttpOnly cookies.
+5. Passwords use the versioned, parameterized scrypt format defined in `docs/security.md`. Sessions use opaque, revocable tokens stored hashed at rest and delivered in secure HttpOnly cookies.
 6. All untrusted request, response, environment, and persisted JSON boundaries use Zod validation where applicable.
 7. Document roles are `owner`, `editor`, and `viewer`. Exactly one owner exists in MVP. Ownership transfer is out of scope.
 8. Current sharing directly grants document access to an existing registered account by normalized email. Future pending-email invitations must be document-scoped, expiring, and single-use.

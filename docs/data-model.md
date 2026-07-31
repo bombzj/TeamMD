@@ -30,7 +30,7 @@ erDiagram
 | `id`                                   | Opaque primary key                               |
 | `email`                                | Display form, never used directly for uniqueness |
 | `normalizedEmail`                      | Lowercased, trimmed identity key; unique         |
-| `passwordHash`                         | Argon2id encoded hash                            |
+| `passwordHash`                         | Versioned scrypt encoded hash                    |
 | `emailVerifiedAt`                      | Nullable until verification is implemented       |
 | `sessionEpoch`                         | Increment to invalidate all sessions             |
 | `createdAt`, `updatedAt`, `disabledAt` | UTC timestamps                                   |

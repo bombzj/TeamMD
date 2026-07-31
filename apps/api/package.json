@@ -29,7 +29,6 @@
     "@prisma/client": "^6.12.0",
     "@teammd/config": "workspace:*",
     "@teammd/contracts": "workspace:*",
-    "argon2": "^0.43.1",
     "dotenv": "^16.6.1",
     "fastify": "^5.4.0",
     "global-jsdom": "26.0.0",

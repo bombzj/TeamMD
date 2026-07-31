@@ -36,6 +36,7 @@ import {
   revokeCollaborator,
   revokePublicLink,
   restoreRevision,
+  saveDocument,
   shareDocument,
   updateCollaboratorRole,
 } from '../../lib/api.js';
@@ -45,6 +46,7 @@ import {
   type CollaborationTransport,
 } from './collaborative-editor.js';
 import { MarkdownPreview } from './MarkdownPreview.js';
+import { createStandaloneEditor } from './standalone-editor.js';
 
 type DocumentEditorProps = {
   documentId: string;
@@ -57,6 +59,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const editorRef = useRef<CollaborativeEditor | null>(null);
   const restoringEditorRef = useRef(false);
   const savedContentRef = useRef('');
+  const standaloneBaseRevisionIdRef = useRef<string | null>(null);
   const initialDocumentRef = useRef<DocumentContentResponse | null>(null);
   const initialDocumentIdRef = useRef(documentId);
   const [content, setContent] = useState('');
@@ -135,15 +138,51 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     mutationFn: async (saveMessage?: string) => {
       const editor = editorRef.current;
       if (editor === null) throw new Error('The editor is not ready.');
+      if (transport === 'offline') {
+        return {
+          mode: 'offline' as const,
+          result: await saveDocument(documentId, {
+            baseRevisionId: standaloneBaseRevisionIdRef.current!,
+            content: editor.getContent(),
+            ...(saveMessage ? { saveMessage } : {}),
+          }),
+        };
+      }
       await editor.prepareCheckpoint();
-      return checkpointCollaboration(documentId, saveMessage);
+      return {
+        mode: 'collaborative' as const,
+        result: await checkpointCollaboration(documentId, saveMessage),
+      };
     },
-    onSuccess: (result) => {
+    onSuccess: (saveResult) => {
+      if (saveResult.mode === 'offline') {
+        const currentContent = editorRef.current?.getContent() ?? '';
+        savedContentRef.current = currentContent;
+        setContent(currentContent);
+        setDirty(false);
+        standaloneBaseRevisionIdRef.current =
+          saveResult.result.currentRevision.id;
+        setRevisionOrdinal(saveResult.result.currentRevision.ordinal);
+        setNotice('Saved');
+        queryClient.setQueryData<DocumentContentResponse>(
+          ['documents', documentId],
+          (current) =>
+            current === undefined
+              ? current
+              : {
+                  ...current,
+                  content: currentContent,
+                  currentRevision: saveResult.result.currentRevision,
+                },
+        );
+        void queryClient.invalidateQueries({ queryKey: ['workspace', 'tree'] });
+        return;
+      }
       applyCheckpoint(
         collaborationCheckpointEventSchema.parse({
           type: 'checkpoint',
-          ...result.currentRevision,
-          contentHash: result.contentHash,
+          ...saveResult.result.currentRevision,
+          contentHash: saveResult.result.contentHash,
         }),
       );
     },
@@ -234,7 +273,36 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         editorRef.current = createdEditor;
       },
       (error) => {
-        if (active) setNotice(messageFor(error));
+        if (!active) return;
+        void createStandaloneEditor({
+          content: initial.content,
+          editorHost,
+          readOnly: initial.permission === 'viewer',
+          onContentChange: (nextContent) => {
+            if (!active) return;
+            setContent(nextContent);
+            setDirty(nextContent !== savedContentRef.current);
+            setNotice(null);
+          },
+        }).then(
+          (standaloneEditor) => {
+            if (!active) {
+              standaloneEditor.destroy();
+              return;
+            }
+            editor = standaloneEditor;
+            editorRef.current = standaloneEditor;
+            standaloneBaseRevisionIdRef.current = initial.currentRevision.id;
+            setTransport('offline');
+            setParticipantCount(1);
+            setNotice(
+              'Collaboration unavailable. Editing saved revisions only.',
+            );
+          },
+          (standaloneError) => {
+            if (active) setNotice(messageFor(standaloneError ?? error));
+          },
+        );
       },
     );
 
@@ -261,7 +329,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         event.preventDefault();
         if (
           dirty &&
-          transport === 'synced' &&
+          (transport === 'synced' || transport === 'offline') &&
           !readOnly &&
           !saveMutation.isPending
         ) {
@@ -297,7 +365,10 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   }
 
   const canSave =
-    dirty && transport === 'synced' && !readOnly && !saveMutation.isPending;
+    dirty &&
+    (transport === 'synced' || transport === 'offline') &&
+    !readOnly &&
+    !saveMutation.isPending;
 
   return (
     <main className="document-editor-shell">
@@ -911,11 +982,13 @@ function TransportState({ transport }: { transport: CollaborationTransport }) {
   const label =
     transport === 'synced'
       ? 'Synced'
-      : transport === 'connected'
-        ? 'Synchronizing'
-        : transport === 'connecting'
-          ? 'Connecting'
-          : 'Offline';
+      : transport === 'offline'
+        ? 'Collaboration off'
+        : transport === 'connected'
+          ? 'Synchronizing'
+          : transport === 'connecting'
+            ? 'Connecting'
+            : 'Offline';
   return (
     <span className={`transport-state ${connected ? 'connected' : ''}`}>
       {connected ? <Cloud size={15} /> : <CloudOff size={15} />}

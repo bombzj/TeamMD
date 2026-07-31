@@ -44,7 +44,7 @@ describe('AuthService with MySQL', () => {
 
     expect(storedUser.normalizedEmail).toBe(testEmail);
     expect(storedUser.passwordHash).not.toContain(password);
-    expect(storedUser.passwordHash).toContain('$argon2id$');
+    expect(storedUser.passwordHash).toMatch(/^scrypt-v1\$/);
     expect(storedSession.tokenHash).not.toBe(result.sessionToken);
     expect(storedSession.csrfTokenHash).not.toBe(result.csrfToken);
   });

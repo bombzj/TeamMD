@@ -9,7 +9,7 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 ## Authentication
 
 - Normalize email deterministically for lookup and uniqueness. Avoid provider-specific dot or plus rewriting.
-- Hash passwords with Argon2id using parameters benchmarked on production hardware and stored in the encoded hash. Initial target: at least 19 MiB memory, 2 iterations, parallelism 1; increase toward OWASP guidance while keeping acceptable latency.
+- Hash passwords with Node's built-in `scrypt` using a random 16-byte salt, a 32-byte derived key, and a versioned encoded format. The initial parameters are `N=32768`, `r=8`, `p=1`, and a 64 MiB memory bound; benchmark and increase them while keeping acceptable latency. This avoids a native authentication dependency on the legacy deployment host. Existing Argon2 hashes require an explicit migration before this format is deployed over populated user data.
 - Require a minimum password length of 12 and allow at least 128 characters, spaces, paste, and password managers. Do not require composition tricks.
 - Check new passwords against a breached-password service or offline corpus before public launch without sending the raw password.
 - Return generic registration/login/reset messages where account existence could leak.

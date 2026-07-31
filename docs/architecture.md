@@ -204,4 +204,6 @@ Real-time collaboration is an additive boundary, not an altered meaning of the s
 
 Existing `Y.Text('content')` rooms use the legacy state format. A request for a structured editor ticket triggers conversion before the final ticket is issued. Conversion runs while the room is serialized and disconnected: preserve the complete operational draft, verify Markdown fidelity, create a fresh structured Yjs document, persist the new format, and increment the generation. Ticket negotiation prevents legacy and structured clients from creating parallel writable roots.
 
+If collaboration cannot initialize, the browser may create a standalone Milkdown editor from the current immutable revision. This degraded mode requires HTTP connectivity, has no presence or live merging, and saves through the whole-document endpoint with `baseRevisionId`, so a newer document head produces `409 REVISION_CONFLICT` instead of an overwrite. An already-initialized Yjs draft is not silently converted into standalone state after a transient disconnect.
+
 Transient reconnect is supported. Durable offline-first editing is deliberately separate from reconnect: it requires browser-side Yjs persistence, bounded queues, generation-aware restore handling, offline revocation semantics, and tested multi-device reconciliation. The current release does not claim offline-first behavior.

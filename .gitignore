@@ -11,3 +11,4 @@ coverage/
 .vscode/
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
+server.conf

@@ -9,7 +9,8 @@ import {
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider';
 import * as Y from 'yjs';
 
-export type CollaborationTransport = `${WebSocketStatus}` | 'synced';
+export type CollaborationTransport =
+  `${WebSocketStatus}` | 'synced' | 'offline';
 
 type CollaborativeEditorOptions = {
   documentId: string;

@@ -15,7 +15,7 @@ Each phase ends with usable behavior, focused automated tests, updated documenta
 ## Phase 1: Identity And Sessions
 
 - Implement registration, login, logout, session rotation, logout-all, and current-user endpoint.
-- Add Argon2id hashing, opaque token storage, secure cookies, CSRF protection, and auth rate limits.
+- Add memory-hard password hashing, opaque token storage, secure cookies, CSRF protection, and auth rate limits.
 - Add email normalization and generic authentication errors.
 - Decide and implement email verification/password reset launch gates.
 
