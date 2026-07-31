@@ -9,6 +9,9 @@ This has **bold**, *emphasis*, ~~strike~~, and [a link](https://example.test).
 
 - [x] Complete
 - [ ] Pending
+  - Nested detail
+
+---
 
 | Feature | Status |
 | --- | --- |
@@ -20,6 +23,12 @@ This has **bold**, *emphasis*, ~~strike~~, and [a link](https://example.test).
 
 \`\`\`ts
 const answer = 42;
+\`\`\`
+
+\`\`\`mermaid
+flowchart LR
+  Browser --> API
+  Browser --> Collaboration
 \`\`\`
 `;
 
@@ -39,9 +48,13 @@ describe('Milkdown collaboration codec', () => {
     expect(serialized).toContain('# Rendered editing');
     expect(serialized).toContain('**bold**');
     expect(serialized).toContain('[x] Complete');
+    expect(serialized).toContain('Nested detail');
+    expect(serialized).toContain('---');
     expect(serialized).toContain('Collaboration');
     expect(serialized).toContain('Working');
     expect(serialized).toContain('```ts');
+    expect(serialized).toContain('```mermaid');
+    expect(serialized).toContain('Browser --> API');
     document.destroy();
   });
 });

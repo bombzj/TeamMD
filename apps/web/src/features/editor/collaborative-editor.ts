@@ -1,4 +1,4 @@
-import { Crepe } from '@milkdown/crepe';
+import type { Crepe } from '@milkdown/crepe';
 import { collab, collabServiceCtx } from '@milkdown/plugin-collab';
 import {
   collaborationCheckpointEventSchema,
@@ -8,6 +8,8 @@ import {
 } from '@teammd/contracts';
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider';
 import * as Y from 'yjs';
+
+import { createTeamMdEditor } from './editor-feature-profile.js';
 
 export type CollaborationTransport =
   `${WebSocketStatus}` | 'synced' | 'offline';
@@ -126,15 +128,7 @@ export async function createCollaborativeEditor(
     window.clearTimeout(syncTimeout);
     if (destroyed) throw new Error('The editor was closed before it loaded.');
 
-    const renderedEditor = new Crepe({
-      root: options.editorHost,
-      features: {
-        [Crepe.Feature.AI]: false,
-        [Crepe.Feature.ImageBlock]: false,
-        [Crepe.Feature.Latex]: false,
-        [Crepe.Feature.TopBar]: true,
-      },
-    });
+    const renderedEditor = createTeamMdEditor(options.editorHost);
     renderedEditor.setReadonly(readOnly);
     renderedEditor.on((listener) => {
       listener.markdownUpdated((_context, markdown) => {

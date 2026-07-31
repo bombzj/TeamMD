@@ -1,6 +1,5 @@
-import { Crepe } from '@milkdown/crepe';
-
 import type { CollaborativeEditor } from './collaborative-editor.js';
+import { createTeamMdEditor } from './editor-feature-profile.js';
 
 type StandaloneEditorOptions = {
   content: string;
@@ -13,16 +12,7 @@ export async function createStandaloneEditor(
   options: StandaloneEditorOptions,
 ): Promise<CollaborativeEditor> {
   let currentContent = options.content;
-  const editor = new Crepe({
-    root: options.editorHost,
-    defaultValue: options.content,
-    features: {
-      [Crepe.Feature.AI]: false,
-      [Crepe.Feature.ImageBlock]: false,
-      [Crepe.Feature.Latex]: false,
-      [Crepe.Feature.TopBar]: true,
-    },
-  });
+  const editor = createTeamMdEditor(options.editorHost, options.content);
   editor.setReadonly(options.readOnly);
   editor.on((listener) => {
     listener.markdownUpdated((_context, markdown) => {
