@@ -88,6 +88,21 @@ The local runtime account is intentionally unable to create Prisma shadow databa
 - Relevant docs, `.env.example`, and ADRs are current.
 - Narrow tests, package typecheck/lint, and required root checks pass.
 
+## Production Deployment
+
+Production releases are anchored to Git but do not fetch mutable branch state directly into the live application directory.
+
+1. Run the required tests, typecheck, lint, formatting, and production build locally or in CI.
+2. Commit the complete release change and push it to the canonical remote.
+3. Verify the local worktree is clean, the local commit equals the remote branch commit, and record the full commit SHA.
+4. Build from that exact commit in a clean checkout or CI workspace. Do not deploy artifacts built from uncommitted files.
+5. Stage the artifact outside the live path, verify its file count and cryptographic hash, then atomically replace the live release while retaining the previous release for rollback.
+6. Apply reviewed database migrations before starting code that requires them. Never use schema push in production.
+7. Verify health, readiness, static assets, WebSocket upgrades, and service state after the release.
+8. Record the source commit, artifact hash, migration state, and rollback path in a non-secret deployment manifest.
+
+The server should not require GitHub during normal startup or rollback. Git provides source provenance and reproducibility; immutable built artifacts, checksums, configuration management, and retained releases provide runtime reliability. Never place production credentials in Git or in deployment manifests.
+
 ## Troubleshooting Principles
 
 - Reproduce database behavior against MySQL, not an in-memory substitute.

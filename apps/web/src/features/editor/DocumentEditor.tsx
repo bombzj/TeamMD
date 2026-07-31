@@ -91,30 +91,31 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const effectivePermission = permission ?? documentQuery.data?.permission;
   const readOnly = effectivePermission === 'viewer';
 
-  const applyCheckpoint = (checkpoint: CollaborationCheckpointEvent) => {
+  const applyCheckpoint = async (checkpoint: CollaborationCheckpointEvent) => {
     const currentContent = editorRef.current?.getContent() ?? '';
-    void contentMatchesHash(currentContent, checkpoint.contentHash).then(
-      (matches) => {
-        if (!matches) return;
-        savedContentRef.current = currentContent;
-        setDirty(editorRef.current?.getContent() !== currentContent);
-        queryClient.setQueryData<DocumentContentResponse>(
-          ['documents', documentId],
-          (current) =>
-            current === undefined
-              ? current
-              : {
-                  ...current,
-                  content: currentContent,
-                  currentRevision: {
-                    id: checkpoint.id,
-                    ordinal: checkpoint.ordinal,
-                    createdAt: checkpoint.createdAt,
-                  },
-                },
-        );
-      },
+    const matches = await contentMatchesHash(
+      currentContent,
+      checkpoint.contentHash,
     );
+    if (matches) {
+      savedContentRef.current = currentContent;
+      setDirty(editorRef.current?.getContent() !== currentContent);
+      queryClient.setQueryData<DocumentContentResponse>(
+        ['documents', documentId],
+        (current) =>
+          current === undefined
+            ? current
+            : {
+                ...current,
+                content: currentContent,
+                currentRevision: {
+                  id: checkpoint.id,
+                  ordinal: checkpoint.ordinal,
+                  createdAt: checkpoint.createdAt,
+                },
+              },
+      );
+    }
     setRevisionOrdinal(checkpoint.ordinal);
     setNotice('Saved');
     queryClient.setQueryData<DocumentContentResponse>(
@@ -132,6 +133,9 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             },
     );
     void queryClient.invalidateQueries({ queryKey: ['workspace', 'tree'] });
+    await queryClient.invalidateQueries({
+      queryKey: ['documents', documentId, 'revisions'],
+    });
   };
 
   const saveMutation = useMutation({
@@ -154,7 +158,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         result: await checkpointCollaboration(documentId, saveMessage),
       };
     },
-    onSuccess: (saveResult) => {
+    onSuccess: async (saveResult) => {
       if (saveResult.mode === 'offline') {
         const currentContent = editorRef.current?.getContent() ?? '';
         savedContentRef.current = currentContent;
@@ -176,9 +180,12 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
                 },
         );
         void queryClient.invalidateQueries({ queryKey: ['workspace', 'tree'] });
+        await queryClient.invalidateQueries({
+          queryKey: ['documents', documentId, 'revisions'],
+        });
         return;
       }
-      applyCheckpoint(
+      await applyCheckpoint(
         collaborationCheckpointEventSchema.parse({
           type: 'checkpoint',
           ...saveResult.result.currentRevision,
@@ -210,7 +217,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
       documentId,
       editorHost,
       createTicket: () => createCollaborationTicket(documentId),
-      onCheckpoint: applyCheckpoint,
+      onCheckpoint: (checkpoint) => void applyCheckpoint(checkpoint),
       onRestore: () => {
         if (!active) return;
         restoringEditorRef.current = true;
@@ -489,7 +496,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
           canRestore={!dirty && transport === 'synced'}
           onClose={() => setHistoryOpen(false)}
           onRestored={(checkpoint) => {
-            applyCheckpoint(
+            void applyCheckpoint(
               collaborationCheckpointEventSchema.parse({
                 type: 'checkpoint',
                 ...checkpoint.currentRevision,

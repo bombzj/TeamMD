@@ -1,7 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../editor/DocumentEditor.js', () => ({
+  DocumentEditor: ({ documentId }: { documentId: string }) => (
+    <main aria-label="Document editor">
+      <h1>Readme.md</h1>
+      <span>{documentId}</span>
+    </main>
+  ),
+}));
 
 import { WorkspaceView } from './WorkspaceView.js';
 
@@ -19,6 +28,7 @@ const createdDocument = {
 };
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
 });
 
@@ -126,6 +136,61 @@ describe('WorkspaceView', () => {
     expect(
       await screen.findByRole('heading', { name: 'Readme.md' }),
     ).toBeTruthy();
+  });
+
+  it('closes an open editor when the workspace view changes', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url === '/api/v1/workspace/tree') {
+        return Promise.resolve(
+          jsonResponse({ folders: [], documents: [createdDocument] }),
+        );
+      }
+      if (url === '/api/v1/shared-with-me') {
+        return Promise.resolve(jsonResponse({ documents: [] }));
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceView
+          view="files"
+          createDocumentRequest={0}
+          onViewChange={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Readme.md' }));
+    await user.click(screen.getByRole('button', { name: 'Open editor' }));
+    expect(await screen.findByLabelText('Document editor')).toBeTruthy();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceView
+          view="shared"
+          createDocumentRequest={0}
+          onViewChange={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Shared with me' }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Document editor')).toBeNull(),
+    );
   });
 });
 

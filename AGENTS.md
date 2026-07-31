@@ -59,6 +59,8 @@ Dependency direction is one way:
 4. Run the narrowest test, typecheck, and lint commands for the changed package.
 5. Update contracts and relevant documentation in the same change.
 
+For production deployment, commit the validated change and push it to the canonical remote before building or modifying the server. Deploy only from a clean worktree at that pushed commit. Record the commit SHA and independently verified artifact hash in the deployment manifest; Git identifies the source, but artifact verification and rollback do not depend on GitHub being available at runtime.
+
 Prefer explicit domain services over business logic in route handlers or React components. Use transactions for writes spanning permissions, revisions, head pointers, invitations, or audit records.
 
 ## API And Error Rules

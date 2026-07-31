@@ -154,6 +154,31 @@ describe('DocumentEditor', () => {
 
   it('checkpoints the authoritative room without sending client Markdown', async () => {
     const updatedContent = '# Updated together\n';
+    const initialHistoryRevision = {
+      id: documentResponse.currentRevision.id,
+      ordinal: 1,
+      createdAt: documentResponse.currentRevision.createdAt,
+      author: {
+        id: 'cm1234567890authorabcdef',
+        email: 'author@example.com',
+      },
+      byteSize: documentResponse.content.length,
+      saveMessage: null,
+      restoredFromRevisionId: null,
+    };
+    const nextRevisionSummary = {
+      id: 'cm1234567890revisionnextab',
+      ordinal: 2,
+      createdAt: '2026-07-28T00:05:00.000Z',
+    };
+    const nextHistoryRevision = {
+      ...nextRevisionSummary,
+      author: initialHistoryRevision.author,
+      byteSize: updatedContent.length,
+      saveMessage: null,
+      restoredFromRevisionId: null,
+    };
+    let saved = false;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
       if (url === `/api/v1/documents/${documentId}`) {
@@ -163,15 +188,21 @@ describe('DocumentEditor', () => {
         return Promise.resolve(jsonResponse(collaborationTicket()));
       }
       if (url.endsWith('/collaboration-checkpoint')) {
+        saved = true;
         return Promise.resolve(
           jsonResponse({
             documentId,
             contentHash: sha256(updatedContent),
-            currentRevision: {
-              id: 'cm1234567890revisionnextab',
-              ordinal: 2,
-              createdAt: '2026-07-28T00:05:00.000Z',
-            },
+            currentRevision: nextRevisionSummary,
+          }),
+        );
+      }
+      if (url.endsWith('/revisions')) {
+        return Promise.resolve(
+          jsonResponse({
+            revisions: saved
+              ? [nextHistoryRevision, initialHistoryRevision]
+              : [initialHistoryRevision],
           }),
         );
       }
@@ -187,6 +218,11 @@ describe('DocumentEditor', () => {
       await screen.findByRole('heading', { name: 'Readme.md' }),
     ).toBeTruthy();
     await waitFor(() => expect(screen.getByText('Synced')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'History' }));
+    expect(
+      await screen.findByRole('button', { name: /Revision 1/ }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Close history' }));
     act(() => {
       collaboration.content = updatedContent;
       collaboration.options?.onContentChange(updatedContent);
@@ -194,7 +230,15 @@ describe('DocumentEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(collaboration.prepareCheckpoint).toHaveBeenCalledOnce();
-    expect(await screen.findAllByText('Revision 2')).toHaveLength(2);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled'),
+      ).toBe(true),
+    );
+    await user.click(screen.getByRole('button', { name: 'History' }));
+    expect(
+      await screen.findByRole('button', { name: /Revision 2/ }),
+    ).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/v1/documents/${documentId}/collaboration-checkpoint`,
       expect.objectContaining({ method: 'POST', body: '{}' }),

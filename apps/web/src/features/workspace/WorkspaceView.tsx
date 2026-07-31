@@ -111,6 +111,10 @@ export function WorkspaceView({
     }
   }, [createDocumentRequest, onViewChange]);
 
+  useEffect(() => {
+    setOpenDocumentId(null);
+  }, [view]);
+
   const openCreate = (kind: 'create-folder' | 'create-document') => {
     setNotice(null);
     setDialog({ kind, parentId: selectedFolderId(selected) });
