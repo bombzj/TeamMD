@@ -42,6 +42,9 @@ Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not 
 - read-only mode, IME composition, visible Undo/Redo through the active Yjs or ProseMirror history, clipboard Markdown, tables, code blocks, links, and narrow viewports remain stable;
 - rich editor controls expose names and tooltips, pointer-driven block/link actions and code-language search receive semantic keyboard activation and visible focus, language entries use listbox option semantics, and mutation controls stay hidden from viewers;
 - exact Mermaid-fence detection, source and line limits, strict SVG sanitization, same-document SVG reference integrity, post-style fitted geometry, Gantt duplicate-label normalization, bounded errors, serialized rapid updates, render timeout, teardown cancellation, source/preview toggling, and source-preserving Markdown serialization;
+- static history/public interception of Vditor's bundled Mermaid path, read-only derived rendering from preserved code text, local invalid-diagram errors, stale revision isolation, and cleanup of pending renders;
+- source-backed constrained flowchart controls, unsupported-syntax fallback, stale/read-only transaction rejection, permission downgrade/upgrade behavior, deterministic one-transaction source rewrites, and rendering-flag rollback with source preservation;
+- a shared rich GFM and nine-family Mermaid corpus consumed by real browser Milkdown and server Milkdown/Yjs codec round trips;
 - browser screenshot checks across flowchart, sequence, class, state, ER, pie, journey, Gantt, and mindmap diagrams for readable labels and marks, contained geometry, preview-local scrolling for wide timelines, and no page overflow;
 - full-screen entry and Escape/visible-control exit preserve the mounted Milkdown/Yjs editor, unsaved draft, transport state, and body scroll cleanup;
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
@@ -93,6 +96,12 @@ Create a document at revision 1 and connect two independent Yjs providers. Apply
 - edits after the captured checkpoint remain visibly unsaved.
 
 Repeat enough times in MySQL CI to expose race behavior, but keep one deterministic service-level locking test for fast feedback.
+
+## Editor Performance Smoke
+
+Set `TEAMMD_PERFORMANCE_SMOKE=true` and run the focused web/API performance tests on a release-class host. The smoke uses synthetic content and logs only timing, byte-count, and heap metrics. Broad regression ceilings are 5 seconds for a 256 KiB editor/codec initialization, 1 second for one editor transaction plus canonical serialization or codec checkpoint serialization, a Yjs update below the existing 2 MiB revision boundary, less than 256 MiB observed heap growth, and Mermaid completion inside the existing 3-second renderer timeout.
+
+On the local Windows/Node 20 validation host, a 265,015-byte Milkdown document mounted in 759 ms; one text transaction plus canonical serialization took 25 ms; observed heap growth was about 13 MiB. The server codec created equivalent Yjs state in 475 ms, emitted a 272,091-byte update, and serialized/hashed the checkpoint projection in 31 ms. A cold representative flowchart rendered in 1,207 ms and a warm 25-node flowchart in 562 ms under deterministic JSDOM SVG measurement. These are smoke observations, not production SLOs, and exclude transport, authorization, database locking, revision writes, and real-browser paint/memory behavior.
 
 ## Rendered Editor Migration Gate
 

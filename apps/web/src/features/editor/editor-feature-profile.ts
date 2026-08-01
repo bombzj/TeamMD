@@ -7,14 +7,19 @@ import { languages as codeMirrorLanguages } from '@codemirror/language-data';
 import { Crepe, type CrepeConfig } from '@milkdown/crepe';
 import type { BlockEditFeatureConfig } from '@milkdown/crepe/feature/block-edit';
 import type { TopBarFeatureConfig } from '@milkdown/crepe/feature/top-bar';
-import { commandsCtx } from '@milkdown/kit/core';
+import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
 import type { Ctx } from '@milkdown/kit/ctx';
 import {
   addBlockTypeCommand,
   codeBlockSchema,
 } from '@milkdown/kit/preset/commonmark';
 
+import { browserConfig } from '../../lib/browser-config.js';
 import { createMermaidPreviewRenderer } from './mermaid-preview.js';
+import {
+  connectVisualMermaidEditor,
+  createVisualMermaidPreview,
+} from './mermaid-visual-editor.js';
 
 const topBarControlNames = [
   'Text style',
@@ -123,8 +128,34 @@ export function createTeamMdEditor(
   root: HTMLElement,
   defaultValue?: string,
 ): Crepe {
-  const mermaidPreview = createMermaidPreviewRenderer();
-  const editor = new Crepe({
+  let editor: Crepe | null = null;
+  const getEditorView = () => {
+    try {
+      return (
+        editor?.editor.action((context) => context.get(editorViewCtx)) ?? null
+      );
+    } catch {
+      return null;
+    }
+  };
+  const boundedPreview = createMermaidPreviewRenderer();
+  const renderPreview = (
+    language: string,
+    source: string,
+    applyPreview: (value: null | string | HTMLElement) => void,
+  ) => {
+    if (!browserConfig.mermaidRenderingEnabled && language === 'mermaid') {
+      return null;
+    }
+    return boundedPreview.renderPreview(language, source, (value) => {
+      if (language !== 'mermaid' || !(value instanceof HTMLElement)) {
+        applyPreview(value);
+        return;
+      }
+      applyPreview(createVisualMermaidPreview(source, value, getEditorView));
+    });
+  };
+  editor = new Crepe({
     root,
     features: editorFeatureProfile,
     featureConfigs: {
@@ -134,17 +165,22 @@ export function createTeamMdEditor(
         previewLabel: 'Diagram preview',
         renderLanguage: (language) =>
           language === 'mermaid' ? 'Mermaid' : language,
-        renderPreview: mermaidPreview.renderPreview,
+        renderPreview,
       },
       [Crepe.Feature.TopBar]: editorTopBarConfig,
     },
     ...(defaultValue === undefined ? {} : { defaultValue }),
   });
+  const disconnectVisualEditor = connectVisualMermaidEditor(
+    root,
+    getEditorView,
+  );
   const disconnectAccessibility = enhanceEditorAccessibility(root);
   const destroy = editor.destroy.bind(editor);
   editor.destroy = async () => {
     disconnectAccessibility();
-    mermaidPreview.destroy();
+    disconnectVisualEditor();
+    boundedPreview.destroy();
     return await destroy();
   };
   return editor;

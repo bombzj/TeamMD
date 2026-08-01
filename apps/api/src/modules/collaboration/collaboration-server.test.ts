@@ -209,13 +209,40 @@ flowchart LR
       expect(convergedMarkdown).toContain('```mermaid');
       expect(convergedMarkdown).not.toContain('<svg');
 
+      const visualEditSource = `flowchart TB
+  Source[Source]
+  Preview[Preview]
+  WriterA[Writer A]
+  WriterB[Writer B]
+  Done[Done]
+  Source --> Preview
+  Preview --> WriterA
+  Preview --> WriterB
+  WriterA --> Done
+  WriterB --> Done`;
+      sourceA.delete(0, sourceA.length);
+      sourceA.insert(0, visualEditSource);
+      await waitForXml(
+        fragmentB,
+        () => getMermaidSource(fragmentB).toJSON() === visualEditSource,
+        'visual Mermaid operation convergence',
+      );
+      expect(codec.read(writerA.document)).toBe(codec.read(writerB.document));
+      expect(codec.read(writerB.document)).toContain(visualEditSource);
+      const visualEditMarkdown = codec.read(writerB.document);
+      expect(
+        writerA.document.getXmlFragment('milkdown').length,
+      ).toBeGreaterThan(0);
+      expect(writerA.document.getText('content').length).toBe(0);
+      expect(writerB.document.getText('content').length).toBe(0);
+
       server.hocuspocus.flushPendingStores();
       await server.hocuspocus
         .openDirectConnection(roomName)
         .then(async (connection) => connection.disconnect());
       const restored = new Y.Doc();
       Y.applyUpdate(restored, service.state);
-      expect(codec.read(restored)).toBe(convergedMarkdown);
+      expect(codec.read(restored)).toBe(visualEditMarkdown);
       expect(codec.read(restored)).not.toContain('<svg');
       expect(restored.getText('content').length).toBe(0);
       restored.destroy();

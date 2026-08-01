@@ -56,6 +56,8 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Treat Milkdown/ProseMirror document content, links, images, code, and plugin attributes as untrusted. Disable raw HTML and unsafe URL schemes in the writable schema, and never persist rendered HTML as a revision.
 - Serialize collaborative checkpoints to Markdown on the trusted server using the same pinned schema version as the client. Reject malformed or unsupported structured state rather than accepting client-supplied Markdown projections.
 - Treat Mermaid source and generated SVG as untrusted. Initialize Mermaid with strict security and HTML labels disabled, render only exact `mermaid` fences, sanitize SVG again with links, scripts, HTML integration points, event/style attributes, and style elements forbidden, and never persist generated output. Supply presentation through trusted application CSS; after sanitizer ID prefixing, preserve only same-document SVG references that resolve to IDs in the sanitized tree and remove external, malformed, or broken references.
+- In static history and public views, keep Vditor sanitization enabled and intercept exact Mermaid classes only after sanitized Markdown conversion. Render preserved code text in a detached read-only host through TeamMD's bounded renderer, discard stale revision work, and never pass generated SVG or derived graph state to editor, collaboration, persistence, or API code.
+- Parse the public Mermaid rendering flag through the separate browser-safe configuration export. Disabling rendering must restore sanitized code presentation in static views and retain the writable fenced source in editors; it must not enable Vditor's bundled renderer or alter Yjs/revision data.
 
 ## Input And Abuse Limits
 

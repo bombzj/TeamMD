@@ -25,8 +25,12 @@ describe('collaborative editor rendering', () => {
     expect(editorSource).toContain('.bindXmlFragment(');
     expect(editorSource).not.toContain('mermaid');
     expect(featureProfileSource).toContain(
-      'renderPreview: mermaidPreview.renderPreview',
+      'const boundedPreview = createMermaidPreviewRenderer();',
     );
+    expect(featureProfileSource).toContain(
+      'return boundedPreview.renderPreview(language, source, (value) => {',
+    );
+    expect(featureProfileSource).toContain('createVisualMermaidPreview(');
     expect(mainSource).toContain(
       "import '@milkdown/crepe/theme/common/style.css';",
     );

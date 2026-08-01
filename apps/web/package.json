@@ -20,6 +20,7 @@
     "@milkdown/kit": "7.21.3",
     "@milkdown/plugin-collab": "7.21.3",
     "@tanstack/react-query": "^5.83.0",
+    "@teammd/config": "workspace:*",
     "@teammd/contracts": "workspace:*",
     "dompurify": "3.4.12",
     "lucide-react": "^0.536.0",

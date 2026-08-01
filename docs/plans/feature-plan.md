@@ -8,7 +8,7 @@ Make TeamMD's Milkdown editor feel complete for everyday Markdown authoring whil
 
 Crepe already enables these features by default in both collaborative and standalone modes: selection toolbar, slash/block editing, headings, bold, emphasis, strikethrough, links, bullet and ordered lists, task lists, blockquotes, tables, fenced code blocks with CodeMirror, placeholders, and cursor support. TeamMD explicitly enables Crepe's top bar and disables AI, image blocks, and LaTeX.
 
-The current editor prototype renders exact `mermaid` fences through Crepe's existing code preview while keeping fenced source authoritative. Remaining gaps are the two-client collaboration/source-preservation gate, static history/public rendering, and rollout compatibility and performance gates.
+The current editor renders exact `mermaid` fences through Crepe's existing code preview while keeping fenced source authoritative. Static history and public views intercept Vditor's bundled Mermaid path and use the same bounded TeamMD renderer from preserved code text. Supported flowcharts expose transient source-backed visual controls; all other syntax remains preview/source-only. Browser/server compatibility, collaboration, accessibility, rendering rollback, performance smoke, and desktop/mobile visual gates are covered by the implementation and tests described below.
 
 ## Product Requirements
 
@@ -90,16 +90,16 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 
 ### Phase 4: Static History And Public Rendering
 
-- Add the same strict Mermaid policy to `MarkdownPreview` for immutable history and public documents.
-- Keep Vditor sanitization enabled and post-process only explicit `language-mermaid` fences through the bounded renderer.
-- Prevent external navigation or embedded active content from generated diagrams.
-- Add tests proving public rendering exposes no editor controls and invalid diagrams do not break the page.
+- Add the same strict Mermaid policy to `MarkdownPreview` for immutable history and public documents. Complete.
+- Keep Vditor sanitization enabled and post-process only explicit `language-mermaid` fences through the bounded renderer. Complete.
+- Prevent external navigation or embedded active content from generated diagrams. Complete through the shared SVG sanitizer.
+- Add tests proving public rendering exposes no editor controls and invalid diagrams do not break the page. Complete.
 
 **Exit gate:** current editor, history, and public views render the same saved Mermaid source consistently and securely.
 
 ### Phase 4A: Source-Backed Visual Diagram Editing
 
-- Replace the generic Mermaid presentation with a dedicated Milkdown node view while preserving the same fenced source node and Yjs binding.
+- Enhance the existing Milkdown code-block node view with derived visual controls while preserving the same fenced source node and Yjs binding. Complete.
 - Start with a constrained flowchart subset: add/rename/delete nodes, create/delete directed edges, and choose layout direction.
 - Parse supported source into transient UI state and serialize every visual operation back to deterministic Mermaid source in one ProseMirror transaction.
 - Keep source mode available at all times and disable visual mutations, without rewriting content, when syntax falls outside the supported subset.
@@ -115,6 +115,8 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - Add a feature flag for Mermaid rendering while keeping source editing available.
 - Roll out to internal documents first, then enable broadly after security and performance gates pass.
 - Document rollback: disable rendering without rewriting source, revisions, or collaboration state.
+
+Completed with one shared rich GFM/nine-family Mermaid corpus, real browser and server codec round trips, opt-in bounded performance smoke tests, and validated `VITE_MERMAID_RENDERING_ENABLED` rollback. Local smoke results and exclusions are recorded in the testing strategy. Broad rollout still follows the normal release gate and must use a freshly built web artifact for any flag change.
 
 **Exit gate:** compatibility corpus, security review, accessibility checks, and measured performance limits pass.
 
@@ -143,7 +145,7 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - [x] Phase 1: Use shared profile in collaborative and standalone adapters.
 - [x] Phase 1: Add feature-profile drift tests.
 - [x] Phase 1: Extend codec round-trip corpus with Mermaid fences and rich constructs.
-- [ ] Phase 2: Audit and test rich controls and accessibility.
+- [x] Phase 2: Audit and test rich controls and accessibility.
 - [x] Phase 2: Add semantic keyboard support for pointer-driven block and link actions.
 - [x] Phase 2: Correct code-language picker search, clear-action, and option semantics.
 - [x] Phase 2: Add full-screen editor mode with Escape and state-preservation tests.
@@ -152,6 +154,6 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - [x] Phase 3: Implement fenced-code Mermaid preview through Crepe's source-preserving preview hook.
 - [x] Phase 3: Add collaboration and source-preservation tests.
 - [x] Phase 3: Add first-class Diagram insertion and compact responsive preview sizing.
-- [ ] Phase 4: Add strict Mermaid rendering to history/public previews.
-- [ ] Phase 4A: Add source-backed visual flowchart editing.
-- [ ] Phase 5: Complete compatibility, security, performance, and visual gates.
+- [x] Phase 4: Add strict Mermaid rendering to history/public previews.
+- [x] Phase 4A: Add source-backed visual flowchart editing.
+- [x] Phase 5: Complete compatibility, security, performance, and visual gates.

@@ -58,6 +58,10 @@ describe('App public document route', () => {
       await screen.findByRole('heading', { name: 'Published notes' }),
     ).toBeTruthy();
     expect(screen.getByText('Public copy')).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /save|undo|redo/i }),
+    ).toBeNull();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/public/documents/resolve',

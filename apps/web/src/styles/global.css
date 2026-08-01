@@ -893,6 +893,7 @@ select:focus-visible {
 
 .document-editor-shell {
   display: block;
+  min-width: 0;
   min-height: 0;
   height: 100%;
   overflow-y: auto;
@@ -1270,6 +1271,110 @@ body.editor-full-screen-open {
 .milkdown-host .milkdown-code-block .preview-panel .preview {
   overflow: auto;
   max-width: 100%;
+}
+.mermaid-visual-preview {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+.mermaid-visual-controls {
+  display: grid;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0 16px;
+  gap: 10px;
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+}
+.mermaid-visual-toolbar,
+.mermaid-visual-edge-creator,
+.mermaid-visual-row {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  align-items: center;
+}
+.mermaid-visual-toolbar {
+  justify-content: space-between;
+}
+.mermaid-visual-controls select,
+.mermaid-visual-controls input {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 9px;
+  color: var(--ink);
+  background: var(--paper-light);
+}
+.mermaid-visual-toolbar select {
+  width: 78px;
+}
+.mermaid-visual-controls .icon-button {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: var(--paper-light);
+}
+.mermaid-visual-controls .icon-button:hover:not(:disabled) {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+.mermaid-visual-controls .icon-button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.mermaid-visual-nodes,
+.mermaid-visual-edges {
+  display: grid;
+  gap: 7px;
+}
+.mermaid-visual-row input {
+  flex: 1;
+}
+.mermaid-node-id,
+.mermaid-visual-row > span:first-child {
+  min-width: 70px;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mermaid-visual-row .icon-button {
+  width: 32px;
+  padding: 0;
+  color: var(--red-dark);
+  font-size: 20px;
+}
+.mermaid-visual-edge-creator {
+  margin-top: 3px;
+}
+.mermaid-visual-edge-creator select {
+  flex: 1;
+}
+.static-mermaid-host {
+  min-height: 0;
+  overflow: visible;
+}
+.static-mermaid-preview {
+  margin-block: 20px;
+}
+@media (max-width: 640px) {
+  .mermaid-visual-edge-creator {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .mermaid-visual-edge-creator select {
+    flex-basis: calc(50% - 4px);
+  }
+  .mermaid-visual-edge-creator .icon-button {
+    width: 100%;
+  }
 }
 .milkdown-host .milkdown-code-block .preview-panel svg {
   display: block;
@@ -1761,7 +1866,7 @@ body.editor-full-screen-open {
     height: auto;
     min-height: calc(100vh - 62px);
     overflow: visible;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .workspace-shell {
     height: auto;

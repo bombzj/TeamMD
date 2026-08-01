@@ -156,6 +156,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.83.0
         version: 5.101.4(react@19.2.8)
+      '@teammd/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@teammd/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

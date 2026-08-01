@@ -1,5 +1,14 @@
 import { waitFor } from '@testing-library/react';
+import { markdownCompatibilityCorpus } from '@teammd/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  browserConfig: { mermaidRenderingEnabled: true },
+}));
+
+vi.mock('../../lib/browser-config.js', () => ({
+  browserConfig: mocks.browserConfig,
+}));
 
 import { createStandaloneEditor } from './standalone-editor.js';
 
@@ -62,6 +71,7 @@ graph TD
 const mountedEditors: Array<{ destroy: () => void }> = [];
 
 afterEach(() => {
+  mocks.browserConfig.mermaidRenderingEnabled = true;
   mountedEditors.splice(0).forEach((editor) => editor.destroy());
   document.body.replaceChildren();
 });
@@ -108,6 +118,19 @@ describe('standalone editor rich features', () => {
     expect(
       host.querySelector('[role="button"][aria-label="Add block"]'),
     ).not.toBeNull();
+    const namedControls = [
+      'Bold',
+      'Code language',
+      'Align column left',
+      'Delete row',
+      'Add column',
+      'Add block',
+    ].map((name) => host.querySelector<HTMLElement>(`[aria-label="${name}"]`));
+    expect(namedControls.every((control) => control !== null)).toBe(true);
+    namedControls.forEach((control) => {
+      expect(control?.getAttribute('title')).toBe(control?.ariaLabel);
+      expect(control?.tabIndex).toBeGreaterThanOrEqual(0);
+    });
 
     const boldButton = host.querySelector<HTMLButtonElement>(
       '.milkdown-top-bar button[aria-label="Bold"]',
@@ -144,7 +167,56 @@ describe('standalone editor rich features', () => {
         .querySelector('.milkdown-table-block [data-role="col-drag-handle"]')
         ?.getAttribute('data-show'),
     ).toBe('false');
+    expect(host.querySelector('.mermaid-visual-controls')).toBeNull();
   });
+
+  it('preserves writable Mermaid source when rendering is disabled', async () => {
+    mocks.browserConfig.mermaidRenderingEnabled = false;
+    const host = mountHost();
+    const editor = await createStandaloneEditor({
+      content: richMarkdown,
+      editorHost: host,
+      readOnly: false,
+      onContentChange: () => {},
+    });
+    mountedEditors.push(editor);
+
+    expect(editor.getContent()).toContain(
+      '```mermaid\ngraph TD\n  Source --> Preview\n```',
+    );
+    expect(host.textContent).toContain('graph TD');
+    expect(host.querySelector('.mermaid-visual-controls')).toBeNull();
+    expect(host.querySelector('.mermaid-preview-svg')).toBeNull();
+  });
+
+  it.each(markdownCompatibilityCorpus)(
+    'stabilizes the shared $name corpus through browser parse/serialize/parse',
+    async ({ markdown, mermaidSources }) => {
+      const firstHost = mountHost();
+      const firstEditor = await createStandaloneEditor({
+        content: markdown,
+        editorHost: firstHost,
+        readOnly: false,
+        onContentChange: () => {},
+      });
+      mountedEditors.push(firstEditor);
+      const serialized = firstEditor.getContent();
+
+      const secondHost = mountHost();
+      const secondEditor = await createStandaloneEditor({
+        content: serialized,
+        editorHost: secondHost,
+        readOnly: false,
+        onContentChange: () => {},
+      });
+      mountedEditors.push(secondEditor);
+
+      expect(secondEditor.getContent()).toBe(serialized);
+      mermaidSources.forEach((source) => {
+        expect(serialized).toContain(`\`\`\`mermaid\n${source}\n\`\`\``);
+      });
+    },
+  );
 });
 
 function mountHost() {

@@ -27,6 +27,8 @@ URL-encode reserved characters in username/password. Do not use a production cre
 
 `DATABASE_URL` is Prisma's connection source. The individual `MYSQL_*` fields are available to local tooling and must describe the same database.
 
+`VITE_MERMAID_RENDERING_ENABLED` is public build-time web configuration and accepts only `true` or `false`. It defaults to `true`. Set it to `false` and rebuild the web artifact to suppress derived Mermaid diagrams and visual controls while leaving every Mermaid fence editable and unchanged. This rollback does not require a database migration or collaboration-state conversion.
+
 ## Bootstrap
 
 ```powershell
@@ -52,6 +54,8 @@ Local endpoints are web `http://localhost:5173`, API `http://localhost:3000`, an
 | `pnpm --filter @teammd/web test` | Run web tests only                     |
 
 Prefer the narrowest package command while iterating, followed by root checks for cross-cutting changes.
+
+Opt-in editor, Mermaid, Yjs-size, and codec performance smoke tests run with `TEAMMD_PERFORMANCE_SMOKE=true` against the focused performance test files. They are intentionally skipped by ordinary unit-test runs because timings depend on the host. Run them on the release environment before broad rollout and compare metrics without logging document content.
 
 ## Database Workflow
 

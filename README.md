@@ -8,7 +8,7 @@ The repository includes a runnable React application, shared Zod contracts, a Fa
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- Rendered-in-place Milkdown/Yjs editing with rich formatting, Undo/Redo, full-screen mode, bounded Mermaid previews, and explicit Save states
+- Rendered-in-place Milkdown/Yjs editing with rich formatting, Undo/Redo, full-screen mode, bounded Mermaid previews, constrained visual flowchart controls, and explicit Save states
 - Immutable revision snapshots with history and restore
 - Direct document sharing with `owner`, `editor`, or `viewer` access
 - Owner-managed, revocable public links to the current saved revision
@@ -67,8 +67,9 @@ Local endpoints:
 
 To add a Mermaid diagram, choose **Diagram** from the editor toolbar or add-block
 menu. TeamMD inserts a rendered starter flowchart whose source can be edited with
-the preview toggle. The source remains an ordinary `mermaid` fenced code block
-when saved and exported.
+the preview toggle. Supported flowcharts also expose source-backed node, edge, and
+direction controls. The source remains an ordinary `mermaid` fenced code block
+when saved and exported; unsupported syntax remains available in source mode.
 
 ## Documentation
 
