@@ -39,5 +39,10 @@ describe('collaborative editor rendering', () => {
     expect(globalStyles).toContain(
       '.milkdown-host .ProseMirror-yjs-cursor > div {',
     );
+    const editorShellRule = globalStyles.match(
+      /\.document-editor-shell \{(?<declarations>[^}]*)\}/u,
+    )?.groups?.declarations;
+    expect(editorShellRule).toContain('display: block;');
+    expect(editorShellRule).not.toContain('grid-template-rows');
   });
 });

@@ -1,14 +1,59 @@
 import { Crepe } from '@milkdown/crepe';
+import {
+  addBlockTypeCommand,
+  codeBlockSchema,
+} from '@milkdown/kit/preset/commonmark';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  editorCodeLanguages,
+  editorBlockEditConfig,
   editorFeatureProfile,
+  editorTopBarConfig,
   enhanceEditorAccessibility,
+  mermaidStarterSource,
 } from './editor-feature-profile.js';
 
 describe('editor feature profile', () => {
+  it('offers Mermaid as the exact source-preserving code language', () => {
+    expect(editorCodeLanguages[0]?.name).toBe('mermaid');
+    expect(editorCodeLanguages[0]?.alias).toContain('mermaid');
+    expect(editorCodeLanguages.length).toBeGreaterThan(1);
+  });
+
+  it('offers first-class Diagram controls that insert canonical Mermaid source', () => {
+    const menuItem = captureAddedItem(editorBlockEditConfig.buildMenu);
+    const topBarItem = captureAddedItem(editorTopBarConfig.buildTopBar);
+    const call = vi.fn();
+    const ctx = { get: vi.fn(() => ({ call })) };
+    const diagramNode = {};
+    const codeBlock = {
+      create: vi.fn(() => diagramNode),
+      schema: { text: vi.fn(() => 'starter-text') },
+    };
+    vi.spyOn(codeBlockSchema, 'type').mockReturnValue(codeBlock as never);
+
+    menuItem.onRun?.(ctx as never);
+    topBarItem.onRun?.(ctx as never);
+
+    expect(menuItem.label).toBe('Diagram');
+    expect(topBarItem.active?.(ctx as never)).toBe(false);
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(call).toHaveBeenNthCalledWith(1, addBlockTypeCommand.key, {
+      nodeType: diagramNode,
+    });
+    expect(call).toHaveBeenNthCalledWith(2, addBlockTypeCommand.key, {
+      nodeType: diagramNode,
+    });
+    expect(codeBlock.schema.text).toHaveBeenCalledWith(mermaidStarterSource);
+    expect(codeBlock.create).toHaveBeenCalledWith(
+      { language: 'mermaid' },
+      'starter-text',
+    );
+  });
+
   it('explicitly enables supported rich editing and disables unplanned features', () => {
     expect(editorFeatureProfile).toEqual({
       [Crepe.Feature.BlockEdit]: true,
@@ -172,3 +217,19 @@ describe('editor feature profile', () => {
     disconnect();
   });
 });
+
+function captureAddedItem(
+  build:
+    | typeof editorBlockEditConfig.buildMenu
+    | typeof editorTopBarConfig.buildTopBar,
+) {
+  const addItem = vi.fn();
+  build({
+    getGroup: vi.fn(() => ({ addItem })),
+  } as never);
+  return addItem.mock.calls[0]?.[1] as {
+    active?: (ctx: never) => boolean;
+    label?: string;
+    onRun?: (ctx: never) => void;
+  };
+}

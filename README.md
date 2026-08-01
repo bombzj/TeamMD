@@ -65,6 +65,11 @@ Local endpoints:
 - API: `http://localhost:3000`
 - Collaboration WebSocket: `ws://localhost:3001`
 
+To add a Mermaid diagram, choose **Diagram** from the editor toolbar or add-block
+menu. TeamMD inserts a rendered starter flowchart whose source can be edited with
+the preview toggle. The source remains an ordinary `mermaid` fenced code block
+when saved and exported.
+
 ## Documentation
 
 - `docs/product-requirements.md`: scope, requirements, and acceptance criteria

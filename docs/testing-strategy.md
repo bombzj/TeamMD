@@ -41,7 +41,8 @@ Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not 
 - rendered Markdown is directly editable without a second live preview, while Vditor remains read-only for static history/public content;
 - read-only mode, IME composition, visible Undo/Redo through the active Yjs or ProseMirror history, clipboard Markdown, tables, code blocks, links, and narrow viewports remain stable;
 - rich editor controls expose names and tooltips, pointer-driven block/link actions and code-language search receive semantic keyboard activation and visible focus, language entries use listbox option semantics, and mutation controls stay hidden from viewers;
-- exact Mermaid-fence detection, source and line limits, strict SVG sanitization, bounded errors, serialized rapid updates, render timeout, teardown cancellation, source/preview toggling, and source-preserving Markdown serialization;
+- exact Mermaid-fence detection, source and line limits, strict SVG sanitization, same-document SVG reference integrity, post-style fitted geometry, Gantt duplicate-label normalization, bounded errors, serialized rapid updates, render timeout, teardown cancellation, source/preview toggling, and source-preserving Markdown serialization;
+- browser screenshot checks across flowchart, sequence, class, state, ER, pie, journey, Gantt, and mindmap diagrams for readable labels and marks, contained geometry, preview-local scrolling for wide timelines, and no page overflow;
 - full-screen entry and Escape/visible-control exit preserve the mounted Milkdown/Yjs editor, unsaved draft, transport state, and body scroll cleanup;
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
 - background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;

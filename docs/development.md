@@ -73,7 +73,7 @@ The local runtime account is intentionally unable to create Prisma shadow databa
 - Use Milkdown's collaboration plugin and one versioned `Y.XmlFragment` as the only writable live surface. Do not synchronize whole Markdown strings or mount a second writable editor.
 - Use Vditor only for sanitized static history/public rendering. It must not be writable in a collaborative room.
 - Pin the Milkdown schema, parser, serializer, and collaboration packages together. A schema change requires a state-format compatibility review and Markdown round-trip corpus.
-- Keep Mermaid rendering behind the existing fenced-code preview hook. Markdown source remains authoritative; generated SVG is strict, sanitized, bounded, disposable, and must never enter Yjs, API payloads, revisions, or logs.
+- Keep Mermaid rendering behind the existing fenced-code preview hook. First-class Diagram controls must insert the same code node with exact lowercase `mermaid` identity and canonical starter source; the code-language picker may display `Mermaid`. Markdown source remains authoritative; generated SVG is compact, responsive, strict, sanitized, bounded, disposable, and must never enter Yjs, API payloads, revisions, or logs. Any visual diagram node view must update that source node rather than maintain parallel writable graph state.
 - Keep the API's hidden Milkdown codec editor and JSDOM globals alive for the process lifetime. Milkdown serializers and delayed lifecycle work retain that context; early teardown can crash later requests.
 - Use TanStack Query for HTTP server state. Yjs owns the shared draft; never replace it from a background refetch.
 - Use stable error codes and exhaustive client handling for save conflicts and authentication expiry.

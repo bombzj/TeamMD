@@ -58,6 +58,47 @@ describe('Mermaid preview renderer', () => {
     );
   });
 
+  it('preserves only sanitized same-document SVG references', () => {
+    const sanitized = sanitizeMermaidSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.2 72.4" width="100%">
+        <defs>
+          <marker id="arrowhead"><path d="M0 0 L10 5 L0 10z" /></marker>
+        </defs>
+        <line marker-end="url(#arrowhead)" />
+        <line marker-end="url(https://example.test/marker.svg#arrowhead)" />
+      </svg>
+    `);
+
+    expect(sanitized).toContain('id="user-content-arrowhead"');
+    expect(sanitized).toContain('marker-end="url(#user-content-arrowhead)"');
+    expect(sanitized).toContain('width="221"');
+    expect(sanitized).not.toContain('width="100%"');
+    expect(sanitized).not.toContain('example.test');
+  });
+
+  it('removes only consecutive duplicate Gantt tick labels', () => {
+    const sanitized = sanitizeMermaidSvg(`
+      <svg xmlns="http://www.w3.org/2000/svg" aria-roledescription="gantt">
+        <g class="grid">
+          <g class="tick"><line /><text>2026-08-01</text></g>
+          <g class="tick"><line /><text>2026-08-01</text></g>
+          <g class="tick"><line /><text>2026-08-02</text></g>
+        </g>
+      </svg>
+    `);
+    const root = new DOMParser().parseFromString(
+      sanitized,
+      'image/svg+xml',
+    ).documentElement;
+
+    expect(root.querySelectorAll('.tick')).toHaveLength(3);
+    expect(
+      [...root.querySelectorAll('.tick text')].map((label) =>
+        label.textContent?.trim(),
+      ),
+    ).toEqual(['2026-08-01', '2026-08-02']);
+  });
+
   it('rejects oversized diagrams without loading Mermaid', () => {
     const loadMermaid = vi.fn();
     const renderer = createMermaidPreviewRenderer({ loadMermaid });

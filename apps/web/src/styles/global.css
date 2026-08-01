@@ -892,7 +892,7 @@ select:focus-visible {
 }
 
 .document-editor-shell {
-  display: grid;
+  display: block;
   min-height: 0;
   height: 100%;
   overflow-y: auto;
@@ -904,7 +904,6 @@ select:focus-visible {
     rgba(215, 209, 196, 0.35) 50%,
     transparent calc(50% + 0.5px)
   );
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 body.editor-full-screen-open {
   overflow: hidden;
@@ -1278,6 +1277,364 @@ body.editor-full-screen-open {
   max-width: 100%;
   height: auto;
   margin: 0 auto;
+}
+.mermaid-measurement-host {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1200px;
+  visibility: hidden;
+  pointer-events: none;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg.flowchart
+  .node
+  > .label-container {
+  fill: var(--paper-light);
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg.flowchart
+  :is(.node .label rect, rect.background) {
+  fill: transparent;
+  stroke: none;
+}
+.milkdown-host .milkdown-code-block .preview-panel svg.flowchart text {
+  fill: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg.flowchart
+  .flowchart-link {
+  fill: none;
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg.flowchart
+  .arrowMarkerPath {
+  fill: var(--red-dark);
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='sequence']
+  rect.actor {
+  fill: var(--paper-light);
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='sequence']
+  :is(text.actor, .messageText) {
+  fill: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='sequence']
+  .actor-line {
+  stroke: var(--line);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='sequence']
+  :is(.messageLine0, .messageLine1) {
+  fill: none;
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='sequence']
+  marker
+  path {
+  fill: var(--red-dark);
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg:is(
+    [aria-roledescription='class'],
+    [aria-roledescription='stateDiagram'],
+    [aria-roledescription='er'],
+    [aria-roledescription='pie'],
+    [aria-roledescription='journey'],
+    [aria-roledescription='gantt'],
+    [aria-roledescription='mindmap']
+  )
+  text {
+  fill: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg:is(
+    [aria-roledescription='class'],
+    [aria-roledescription='stateDiagram'],
+    [aria-roledescription='er']
+  )
+  rect:not(.background) {
+  fill: var(--paper-light);
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg:is(
+    [aria-roledescription='class'],
+    [aria-roledescription='stateDiagram'],
+    [aria-roledescription='er'],
+    [aria-roledescription='mindmap']
+  )
+  rect.background {
+  fill: transparent;
+  stroke: none;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='class']
+  .relation,
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='stateDiagram']
+  .transition,
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='er']
+  .relationshipLine {
+  fill: none;
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg:is(
+    [aria-roledescription='class'],
+    [aria-roledescription='stateDiagram'],
+    [aria-roledescription='er']
+  )
+  marker
+  :is(path, polygon, circle) {
+  fill: var(--red-dark);
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='stateDiagram']
+  .state-start {
+  fill: var(--red-dark);
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='pie']
+  .pieOuterCircle {
+  fill: var(--paper-light);
+  stroke: var(--line-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='pie']
+  .pieCircle:nth-of-type(4n + 1) {
+  fill: #a83c32;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='pie']
+  .pieCircle:nth-of-type(4n + 2) {
+  fill: #39708f;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='pie']
+  .pieCircle:nth-of-type(4n + 3) {
+  fill: #6f7f52;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='pie']
+  .pieCircle:nth-of-type(4n) {
+  fill: #c8953f;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='pie']
+  text.slice {
+  fill: white;
+  font-weight: 600;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  .journey-section.section-type-0,
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  .task.task-type-0 {
+  fill: #ead3cf;
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  .journey-section.section-type-1,
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  .task.task-type-1 {
+  fill: #d9e6ed;
+  stroke: #39708f;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  :is(.task-line, line) {
+  stroke: var(--line-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  :is(.face, circle[class^='actor-']) {
+  fill: var(--paper-light);
+  stroke: var(--red-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='journey']
+  :is(.mouth, line.mouth) {
+  fill: none;
+  stroke: var(--ink);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  .section.section0 {
+  fill: #eeeae1;
+  stroke: var(--line);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt'] {
+  max-width: none;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  .grid
+  .tick {
+  stroke: var(--line);
+  opacity: 0.8;
+  shape-rendering: crispEdges;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  .grid
+  path {
+  stroke-width: 0;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  .task.done0 {
+  fill: #6f7f52;
+  stroke: #52613b;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  .task.active0 {
+  fill: #c8953f;
+  stroke: #8d6526;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  :is(.taskText, .sectionTitle) {
+  font-size: 11px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  .taskText {
+  text-anchor: middle;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='gantt']
+  :is(.domain, line) {
+  stroke: var(--line-dark);
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='mindmap']
+  .edge {
+  fill: none;
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='mindmap']
+  :is(.label-container, .node-bkg) {
+  fill: var(--paper-light);
+  stroke: var(--red-dark);
+  stroke-width: 1.5px;
+}
+.milkdown-host
+  .milkdown-code-block
+  .preview-panel
+  svg[aria-roledescription='mindmap']
+  .node-line- {
+  stroke: var(--red-dark);
 }
 .milkdown-host .mermaid-preview-error {
   border-left: 3px solid var(--red);

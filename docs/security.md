@@ -55,7 +55,7 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Pin and audit Vditor behavior when upgrading; add sanitization regression fixtures.
 - Treat Milkdown/ProseMirror document content, links, images, code, and plugin attributes as untrusted. Disable raw HTML and unsafe URL schemes in the writable schema, and never persist rendered HTML as a revision.
 - Serialize collaborative checkpoints to Markdown on the trusted server using the same pinned schema version as the client. Reject malformed or unsupported structured state rather than accepting client-supplied Markdown projections.
-- Treat Mermaid source and generated SVG as untrusted. Initialize Mermaid with strict security and HTML labels disabled, render only exact `mermaid` fences, sanitize SVG again with links, scripts, HTML integration points, event/style attributes, and style elements forbidden, and never persist generated output.
+- Treat Mermaid source and generated SVG as untrusted. Initialize Mermaid with strict security and HTML labels disabled, render only exact `mermaid` fences, sanitize SVG again with links, scripts, HTML integration points, event/style attributes, and style elements forbidden, and never persist generated output. Supply presentation through trusted application CSS; after sanitizer ID prefixing, preserve only same-document SVG references that resolve to IDs in the sanitized tree and remove external, malformed, or broken references.
 
 ## Input And Abuse Limits
 

@@ -1,4 +1,18 @@
+import {
+  LanguageDescription,
+  LanguageSupport,
+  StreamLanguage,
+} from '@codemirror/language';
+import { languages as codeMirrorLanguages } from '@codemirror/language-data';
 import { Crepe, type CrepeConfig } from '@milkdown/crepe';
+import type { BlockEditFeatureConfig } from '@milkdown/crepe/feature/block-edit';
+import type { TopBarFeatureConfig } from '@milkdown/crepe/feature/top-bar';
+import { commandsCtx } from '@milkdown/kit/core';
+import type { Ctx } from '@milkdown/kit/ctx';
+import {
+  addBlockTypeCommand,
+  codeBlockSchema,
+} from '@milkdown/kit/preset/commonmark';
 
 import { createMermaidPreviewRenderer } from './mermaid-preview.js';
 
@@ -14,6 +28,7 @@ const topBarControlNames = [
   'Link',
   'Table',
   'Code block',
+  'Diagram',
   'Blockquote',
   'Horizontal rule',
 ] as const;
@@ -48,6 +63,62 @@ export const editorFeatureProfile = {
   [Crepe.Feature.Latex]: false,
 } satisfies NonNullable<CrepeConfig['features']>;
 
+const mermaidLanguage = LanguageDescription.of({
+  name: 'mermaid',
+  alias: ['mermaid'],
+  support: new LanguageSupport(
+    StreamLanguage.define({
+      token(stream) {
+        stream.skipToEnd();
+        return null;
+      },
+    }),
+  ),
+});
+
+export const editorCodeLanguages = [mermaidLanguage, ...codeMirrorLanguages];
+
+const diagramIcon = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="6" height="5" rx="1" />
+    <rect x="15" y="15" width="6" height="5" rx="1" />
+    <path d="M9 6.5h3a4 4 0 0 1 4 4V15M13 12l3 3 3-3" fill="none" stroke="currentColor" stroke-width="2" />
+  </svg>
+`;
+
+export const mermaidStarterSource = 'flowchart LR\n  Start --> Done';
+
+export const editorBlockEditConfig = {
+  buildMenu: (builder) => {
+    builder.getGroup('advanced').addItem('diagram', {
+      label: 'Diagram',
+      icon: diagramIcon,
+      onRun: insertMermaidDiagram,
+    });
+  },
+} satisfies BlockEditFeatureConfig;
+
+export const editorTopBarConfig = {
+  buildTopBar: (builder) => {
+    builder.getGroup('block').addItem('diagram', {
+      icon: diagramIcon,
+      active: () => false,
+      onRun: insertMermaidDiagram,
+    });
+  },
+} satisfies TopBarFeatureConfig;
+
+function insertMermaidDiagram(ctx: Ctx): void {
+  const commands = ctx.get(commandsCtx);
+  const codeBlock = codeBlockSchema.type(ctx);
+  commands.call(addBlockTypeCommand.key, {
+    nodeType: codeBlock.create(
+      { language: 'mermaid' },
+      codeBlock.schema.text(mermaidStarterSource),
+    ),
+  });
+}
+
 export function createTeamMdEditor(
   root: HTMLElement,
   defaultValue?: string,
@@ -57,10 +128,15 @@ export function createTeamMdEditor(
     root,
     features: editorFeatureProfile,
     featureConfigs: {
+      [Crepe.Feature.BlockEdit]: editorBlockEditConfig,
       [Crepe.Feature.CodeMirror]: {
+        languages: editorCodeLanguages,
         previewLabel: 'Diagram preview',
+        renderLanguage: (language) =>
+          language === 'mermaid' ? 'Mermaid' : language,
         renderPreview: mermaidPreview.renderPreview,
       },
+      [Crepe.Feature.TopBar]: editorTopBarConfig,
     },
     ...(defaultValue === undefined ? {} : { defaultValue }),
   });

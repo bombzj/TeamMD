@@ -19,6 +19,7 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - Viewers remain read-only and do not see controls that imply write access.
 - Toolbar and slash-command actions remain keyboard accessible and do not obscure document content on desktop or mobile.
 - The complete editor can enter and exit a distraction-free full-screen layout without remounting the collaborative editor or losing draft state.
+- The editor scrolls through the complete document, including a final diagram, with clear end spacing; the revision/character/save-state footer follows the actual document end instead of overlapping content or floating above it.
 - Unsupported or lossy Markdown is never silently normalized into a different meaning.
 
 ### Mermaid
@@ -27,6 +28,8 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - The Mermaid source is the only writable and collaborative representation.
 - Rendered SVG is disposable UI and is never persisted in Yjs, revisions, APIs, or the database.
 - A diagram can switch between rendered preview and source editing without losing source text, cursor ownership, or undo history.
+- A first-class Diagram action inserts a valid starter diagram without exposing generic code-block setup.
+- Compact diagrams render at their intrinsic viewBox width and scale down responsively. Wide timeline diagrams preserve readable scale in preview-local horizontal scrolling without causing page overflow.
 - Invalid diagrams show a local error and retain editable source.
 - History and public views render the same saved Mermaid fences under the same security policy.
 - Exported Markdown remains portable and contains the original Mermaid fence.
@@ -39,6 +42,7 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 4. Server checkpoints continue to serialize canonical Markdown from authoritative room state.
 5. Standalone fallback continues to save through `baseRevisionId` and stale-write rejection.
 6. Vditor remains read-only. Mermaid support in Vditor-based views must be configured as sanitized rendering rather than made writable.
+7. Visual node/connector editing must deterministically rewrite the same Mermaid source node and fall back to source mode for unsupported syntax; it must never introduce parallel writable graph state.
 
 ## Security And Resource Limits
 
@@ -93,6 +97,16 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 
 **Exit gate:** current editor, history, and public views render the same saved Mermaid source consistently and securely.
 
+### Phase 4A: Source-Backed Visual Diagram Editing
+
+- Replace the generic Mermaid presentation with a dedicated Milkdown node view while preserving the same fenced source node and Yjs binding.
+- Start with a constrained flowchart subset: add/rename/delete nodes, create/delete directed edges, and choose layout direction.
+- Parse supported source into transient UI state and serialize every visual operation back to deterministic Mermaid source in one ProseMirror transaction.
+- Keep source mode available at all times and disable visual mutations, without rewriting content, when syntax falls outside the supported subset.
+- Route visual operations through Milkdown/Yjs history so collaboration, Undo/Redo, checkpoints, and conflict behavior remain unchanged.
+
+**Exit gate:** two clients can visually edit the supported flowchart subset, converge on identical portable Mermaid source, undo local operations, and switch to source mode without loss.
+
 ### Phase 5: Compatibility, Performance, And Rollout
 
 - Add a shared Markdown corpus covering all supported constructs and Mermaid examples.
@@ -111,7 +125,7 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - **Component:** toolbar/read-only behavior, source-preview switching, history/public rendering, and invalid diagram handling.
 - **Collaboration:** concurrent edits inside and around Mermaid fences, awareness cursors, undo, reconnect, and checkpoint serialization.
 - **End to end:** create a rich document, add a Mermaid diagram, collaborate, save, inspect history, open a public link, restore, and verify source remains unchanged.
-- **Visual:** desktop/mobile screenshots for long tables, code blocks, slash menu, toolbars, and large diagrams with no overlap.
+- **Visual:** desktop/mobile screenshots for long tables, code blocks, slash menu, toolbars, and a Mermaid matrix covering flowchart, sequence, class, state, ER, pie, journey, Gantt, and mindmap diagrams with readable labels, contained geometry, and no page overflow.
 
 ## Definition Of Done
 
@@ -137,5 +151,7 @@ The current editor prototype renders exact `mermaid` fences through Crepe's exis
 - [x] Phase 3: Add secure Mermaid renderer dependencies and limits.
 - [x] Phase 3: Implement fenced-code Mermaid preview through Crepe's source-preserving preview hook.
 - [x] Phase 3: Add collaboration and source-preservation tests.
+- [x] Phase 3: Add first-class Diagram insertion and compact responsive preview sizing.
 - [ ] Phase 4: Add strict Mermaid rendering to history/public previews.
+- [ ] Phase 4A: Add source-backed visual flowchart editing.
 - [ ] Phase 5: Complete compatibility, security, performance, and visual gates.

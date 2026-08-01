@@ -17,7 +17,7 @@ type MermaidEngine = {
 
 type MermaidPreviewDependencies = {
   loadMermaid?: () => Promise<MermaidEngine>;
-  sanitizeSvg?: (svg: string) => string;
+  sanitizeSvg?: (svg: string) => string | HTMLElement;
 };
 
 type RenderTask = () => Promise<void>;
@@ -38,7 +38,9 @@ export function createMermaidPreviewRenderer(
   dependencies: MermaidPreviewDependencies = {},
 ): MermaidPreviewRenderer {
   const loadMermaid = dependencies.loadMermaid ?? loadDefaultMermaid;
-  const sanitizeSvg = dependencies.sanitizeSvg ?? sanitizeMermaidSvg;
+  const sanitizeSvg =
+    dependencies.sanitizeSvg ??
+    ((svg: string) => createMermaidPreview(sanitizeMermaidSvg(svg)));
   const previewVersions = new WeakMap<ApplyPreview, number>();
   const pendingTimers = new Set<number>();
   const renderQueue: RenderTask[] = [];
@@ -173,12 +175,139 @@ function createErrorPreview(message: string): HTMLElement {
 }
 
 export function sanitizeMermaidSvg(svg: string): string {
-  return DOMPurify.sanitize(svg, {
+  const sanitized = DOMPurify.sanitize(svg, {
     FORBID_ATTR: ['href', 'style', 'xlink:href'],
     FORBID_TAGS: ['a', 'foreignObject', 'iframe', 'script', 'style'],
     SANITIZE_NAMED_PROPS: true,
     USE_PROFILES: { svg: true, svgFilters: true },
   });
+  return repairLocalSvgReferences(sanitized);
+}
+
+const svgReferenceAttributes = [
+  'clip-path',
+  'fill',
+  'filter',
+  'marker-end',
+  'marker-mid',
+  'marker-start',
+  'mask',
+  'stroke',
+] as const;
+
+function repairLocalSvgReferences(svg: string): string {
+  const template = document.createElement('template');
+  template.innerHTML = svg;
+  const root = template.content.querySelector('svg');
+  if (root === null) return '';
+  normalizeSvgWidth(root);
+  removeDuplicateGanttTickLabels(root);
+  const sanitizedIds = new Set(
+    [...root.querySelectorAll('[id]')].map((element) => element.id),
+  );
+
+  root.querySelectorAll('*').forEach((element) => {
+    svgReferenceAttributes.forEach((attribute) => {
+      const value = element.getAttribute(attribute);
+      if (value === null || !value.toLowerCase().includes('url(')) return;
+      const match = /^url\(#([^)]+)\)$/u.exec(value);
+      if (match === null) {
+        element.removeAttribute(attribute);
+        return;
+      }
+      const id = match[1];
+      if (id === undefined) {
+        element.removeAttribute(attribute);
+        return;
+      }
+      const prefixedId = id.startsWith('user-content-')
+        ? id
+        : `user-content-${id}`;
+      if (!sanitizedIds.has(prefixedId)) {
+        element.removeAttribute(attribute);
+        return;
+      }
+      element.setAttribute(attribute, `url(#${prefixedId})`);
+    });
+  });
+
+  return root.outerHTML;
+}
+
+function removeDuplicateGanttTickLabels(root: SVGSVGElement): void {
+  if (root.getAttribute('aria-roledescription') !== 'gantt') return;
+  let previousLabel = '';
+  root.querySelectorAll('.grid .tick text').forEach((label) => {
+    const value = label.textContent?.trim() ?? '';
+    if (value !== '' && value === previousLabel) {
+      label.remove();
+      return;
+    }
+    previousLabel = value;
+  });
+}
+
+function createMermaidPreview(svg: string): HTMLElement {
+  const preview = document.createElement('div');
+  preview.className = 'mermaid-preview-content';
+  preview.innerHTML = svg;
+  const root = preview.querySelector('svg');
+  if (root === null) return preview;
+  normalizeSvgWidth(root);
+  fitSanitizedSvg(preview, root);
+  return preview;
+}
+
+function normalizeSvgWidth(root: SVGSVGElement): void {
+  const viewBox = root
+    .getAttribute('viewBox')
+    ?.trim()
+    .split(/[\s,]+/u)
+    .map(Number);
+  const width = viewBox?.[2];
+  if (width === undefined || !Number.isFinite(width) || width <= 0) return;
+  root.setAttribute('width', String(Math.ceil(width)));
+  root.removeAttribute('height');
+}
+
+function fitSanitizedSvg(preview: HTMLElement, root: SVGSVGElement): void {
+  const measurementPreview = preview.cloneNode(true) as HTMLElement;
+  const measurementRoot = measurementPreview.querySelector('svg');
+  if (measurementRoot === null) return;
+  const host = document.createElement('div');
+  host.className = 'milkdown-host mermaid-measurement-host';
+  const codeBlock = document.createElement('div');
+  codeBlock.className = 'milkdown-code-block';
+  const panel = document.createElement('div');
+  panel.className = 'preview-panel';
+  const frame = document.createElement('div');
+  frame.className = 'preview';
+  frame.append(measurementPreview);
+  panel.append(frame);
+  codeBlock.append(panel);
+  host.append(codeBlock);
+  document.body.append(host);
+  const bounds = measurementRoot.getBBox();
+  const hasValidBounds =
+    Number.isFinite(bounds.x) &&
+    Number.isFinite(bounds.y) &&
+    Number.isFinite(bounds.width) &&
+    Number.isFinite(bounds.height) &&
+    bounds.width > 0 &&
+    bounds.height > 0;
+  if (hasValidBounds) {
+    const padding = 8;
+    const width = bounds.width + padding * 2;
+    const height = bounds.height + padding * 2;
+    root.setAttribute(
+      'viewBox',
+      `${bounds.x - padding} ${bounds.y - padding} ${width} ${height}`,
+    );
+    root.setAttribute('width', String(Math.ceil(width)));
+    root.removeAttribute('height');
+    root.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  }
+  host.remove();
 }
 
 async function loadDefaultMermaid(): Promise<MermaidEngine> {

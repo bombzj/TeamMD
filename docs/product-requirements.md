@@ -53,6 +53,8 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-013:** Owners and editors have visible Undo and Redo controls that invoke the active editor history. Collaborative rooms use the client-local Yjs undo manager, standalone fallback uses ProseMirror history, and viewers receive no mutation controls.
 - **REQ-EDIT-014:** Rich editor actions expose accessible names, visible keyboard focus, and keyboard activation even when the underlying Milkdown control is pointer-driven. Read-only viewers do not receive mutation controls.
 - **REQ-EDIT-015:** A fenced code block whose language is exactly `mermaid` can show a disposable diagram preview while its original fence remains the only editable, collaborative, saved, and exported representation. Invalid or oversized diagrams retain editable source and show a bounded local error instead of changing document content.
+- **REQ-EDIT-016:** Editors can insert a starter Mermaid diagram through a first-class Diagram control without creating a generic code block or selecting a code language. Compact diagram previews use intrinsic sizing and scale down within narrow editor widths; wide timeline diagrams retain readable scale inside preview-local horizontal scrolling without causing page overflow.
+- **REQ-EDIT-017:** A future visual diagram editor may manipulate supported Mermaid nodes and connectors directly only when each operation deterministically updates the same fenced Mermaid source in the Milkdown/Yjs document. It must provide source mode for unsupported syntax and must not introduce a parallel writable graph state.
 
 ### Sharing
 
