@@ -168,6 +168,12 @@ describe('collaboration gateway', () => {
     service.stateFormat = 'milkdown-xml-v1';
     service.state = codec.createState(`# Structured room
 
+  Inline formula: $E = mc^2$.
+
+  $$
+  \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+  $$
+
 \`\`\`mermaid
 flowchart LR
   Source --> Preview
@@ -207,6 +213,11 @@ flowchart LR
       const convergedMarkdown = codec.read(writerA.document);
       expect(codec.read(writerB.document)).toBe(convergedMarkdown);
       expect(convergedMarkdown).toContain('```mermaid');
+      expect(convergedMarkdown).toContain('$E = mc^2$');
+      expect(convergedMarkdown).toContain(
+        '$$\n\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\n$$',
+      );
+      expect(convergedMarkdown).not.toContain('katex');
       expect(convergedMarkdown).not.toContain('<svg');
 
       const visualEditSource = `flowchart TB
@@ -243,6 +254,8 @@ flowchart LR
       const restored = new Y.Doc();
       Y.applyUpdate(restored, service.state);
       expect(codec.read(restored)).toBe(visualEditMarkdown);
+      expect(codec.read(restored)).toContain('$E = mc^2$');
+      expect(codec.read(restored)).not.toContain('<math');
       expect(codec.read(restored)).not.toContain('<svg');
       expect(restored.getText('content').length).toBe(0);
       restored.destroy();

@@ -1,6 +1,7 @@
 export type MarkdownCompatibilityCase = {
   name: string;
   markdown: string;
+  mathSources: readonly string[];
   mermaidSources: readonly string[];
 };
 
@@ -95,11 +96,34 @@ export const markdownCompatibilityCorpus: readonly MarkdownCompatibilityCase[] =
     {
       name: 'rich GFM',
       markdown: richMarkdown,
+      mathSources: [],
+      mermaidSources: [],
+    },
+    {
+      name: 'KaTeX inline and display math',
+      markdown: `${richMarkdown}
+Inline formula: $E = mc^2$ and $\\sqrt{x^2 + y^2}$.
+
+$$
+\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}
+$$
+
+$$
+\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}
+$$
+`,
+      mathSources: [
+        'E = mc^2',
+        '\\sqrt{x^2 + y^2}',
+        '\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}',
+        '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}',
+      ],
       mermaidSources: [],
     },
     ...mermaidExamples.map(({ name, source }) => ({
       name: `Mermaid ${name}`,
       markdown: `${richMarkdown}\n\`\`\`mermaid\n${source}\n\`\`\`\n`,
+      mathSources: [],
       mermaidSources: [source],
     })),
   ];

@@ -14,7 +14,14 @@ import { getMilkdownCodec } from './milkdown-codec.js';
 const documentId = 'cm1234567890documentabcde';
 const userId = 'cm1234567890userabcdefgh';
 const baseRevisionId = 'cm1234567890revisionabcde';
-const roomContent = '# Authoritative room\n';
+const roomContent = `# Authoritative room
+
+Inline $E = mc^2$.
+
+$$
+\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}
+$$
+`;
 const savedRevision = {
   id: 'cm1234567890revisionnextab',
   ordinal: 2,

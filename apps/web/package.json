@@ -23,6 +23,7 @@
     "@teammd/config": "workspace:*",
     "@teammd/contracts": "workspace:*",
     "dompurify": "3.4.12",
+    "katex": "0.17.0",
     "lucide-react": "^0.536.0",
     "mermaid": "11.16.0",
     "react": "^19.1.0",

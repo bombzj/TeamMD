@@ -7,7 +7,7 @@ import { getMilkdownCodec } from './milkdown-codec.js';
 describe('Milkdown collaboration codec', () => {
   it.each(markdownCompatibilityCorpus)(
     'round-trips $name through a Y.XmlFragment',
-    async ({ markdown, mermaidSources }) => {
+    async ({ markdown, mathSources, mermaidSources }) => {
       const codec = await getMilkdownCodec();
       const state = codec.createState(markdown);
       const document = new Y.Doc();
@@ -25,6 +25,9 @@ describe('Milkdown collaboration codec', () => {
       expect(serialized).toContain('Collaboration');
       expect(serialized).toContain('Working');
       expect(serialized).toContain('```ts');
+      mathSources.forEach((source) => {
+        expect(serialized).toContain(source);
+      });
       mermaidSources.forEach((source) => {
         expect(serialized).toContain(`\`\`\`mermaid\n${source}\n\`\`\``);
       });

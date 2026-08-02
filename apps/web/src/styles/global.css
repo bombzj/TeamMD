@@ -1364,6 +1364,31 @@ body.editor-full-screen-open {
 .static-mermaid-preview {
   margin-block: 20px;
 }
+.teammd-katex-display {
+  max-width: 100%;
+  margin-block: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 4px;
+}
+.milkdown-code-block .preview-panel .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 4px;
+}
+.teammd-katex-inline {
+  max-width: 100%;
+}
+.teammd-katex-error {
+  margin-block: 12px;
+  border-left: 3px solid var(--red-dark);
+  padding: 10px 12px;
+  color: var(--red-dark);
+  background: var(--paper-light);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+}
 @media (max-width: 640px) {
   .mermaid-visual-edge-creator {
     align-items: stretch;

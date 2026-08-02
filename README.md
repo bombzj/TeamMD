@@ -8,7 +8,7 @@ The repository includes a runnable React application, shared Zod contracts, a Fa
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- Rendered-in-place Milkdown/Yjs editing with rich formatting, Undo/Redo, full-screen mode, bounded Mermaid previews, constrained visual flowchart controls, and explicit Save states
+- Rendered-in-place Milkdown/Yjs editing with rich formatting, local inline/display KaTeX, Undo/Redo, full-screen mode, bounded Mermaid previews, constrained visual flowchart controls, and explicit Save states
 - Immutable revision snapshots with history and restore
 - Direct document sharing with `owner`, `editor`, or `viewer` access
 - Owner-managed, revocable public links to the current saved revision
@@ -21,15 +21,15 @@ Transient network interruptions are handled by Hocuspocus reconnect and durable 
 
 ## Stack
 
-| Area          | Choice                                                |
-| ------------- | ----------------------------------------------------- |
-| Web           | React 19, Vite, TypeScript, Milkdown, Mermaid, Vditor |
-| Collaboration | Yjs, Hocuspocus, Milkdown collaboration plugin        |
-| API           | Node.js 22 LTS, Fastify, TypeScript, Zod              |
-| Data          | MySQL 8.4, Prisma migrations                          |
-| Auth          | Argon2id, opaque cookie sessions, CSRF protection     |
-| Tests         | Vitest and Fastify injection                          |
-| Workspace     | pnpm monorepo                                         |
+| Area          | Choice                                                       |
+| ------------- | ------------------------------------------------------------ |
+| Web           | React 19, Vite, TypeScript, Milkdown, KaTeX, Mermaid, Vditor |
+| Collaboration | Yjs, Hocuspocus, Milkdown collaboration plugin               |
+| API           | Node.js 22 LTS, Fastify, TypeScript, Zod                     |
+| Data          | MySQL 8.4, Prisma migrations                                 |
+| Auth          | Argon2id, opaque cookie sessions, CSRF protection            |
+| Tests         | Vitest and Fastify injection                                 |
+| Workspace     | pnpm monorepo                                                |
 
 ## Repository Layout
 
@@ -70,6 +70,8 @@ menu. TeamMD inserts a rendered starter flowchart whose source can be edited wit
 the preview toggle. Supported flowcharts also expose source-backed node, edge, and
 direction controls. The source remains an ordinary `mermaid` fenced code block
 when saved and exported; unsupported syntax remains available in source mode.
+
+Use `$E = mc^2$` for inline formulas and `$$...$$` on separate lines for display formulas. The editor and read-only history/public views render them locally with KaTeX, including `mhchem` commands such as `\\ce{H2O}`, while saved and exported documents retain only the portable formula source.
 
 ## Documentation
 

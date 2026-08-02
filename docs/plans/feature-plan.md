@@ -6,7 +6,7 @@ Make TeamMD's Milkdown editor feel complete for everyday Markdown authoring whil
 
 ## Current Baseline
 
-Crepe already enables these features by default in both collaborative and standalone modes: selection toolbar, slash/block editing, headings, bold, emphasis, strikethrough, links, bullet and ordered lists, task lists, blockquotes, tables, fenced code blocks with CodeMirror, placeholders, and cursor support. TeamMD explicitly enables Crepe's top bar and disables AI, image blocks, and LaTeX.
+Crepe enables these features in both collaborative and standalone modes: selection toolbar, slash/block editing, headings, bold, emphasis, strikethrough, links, bullet and ordered lists, task lists, blockquotes, tables, fenced code blocks with CodeMirror, placeholders, cursor support, and local KaTeX rendering for inline/display formulas. TeamMD explicitly enables Crepe's top bar and LaTeX feature while disabling AI and image blocks.
 
 The current editor renders exact `mermaid` fences through Crepe's existing code preview while keeping fenced source authoritative. Static history and public views intercept Vditor's bundled Mermaid path and use the same bounded TeamMD renderer from preserved code text. Supported flowcharts expose transient source-backed visual controls; all other syntax remains preview/source-only. Browser/server compatibility, collaboration, accessibility, rendering rollback, performance smoke, and desktop/mobile visual gates are covered by the implementation and tests described below.
 
@@ -34,6 +34,14 @@ The current editor renders exact `mermaid` fences through Crepe's existing code 
 - History and public views render the same saved Mermaid fences under the same security policy.
 - Exported Markdown remains portable and contains the original Mermaid fence.
 
+### Math
+
+- Inline `$...$` and display `$$...$$` formula source is the only writable, collaborative, saved, and exported representation.
+- The editor, immutable history, and public views render formulas locally with pinned KaTeX and the local `mhchem` extension.
+- KaTeX HTML and MathML are disposable UI and never enter Yjs, revisions, APIs, exports, or persistence.
+- Invalid or oversized formulas show a local bounded result without changing surrounding content.
+- Wide display formulas scroll within their own preview and do not cause page overflow.
+
 ## Architectural Constraints
 
 1. Milkdown remains the sole writable editor and continues to bind one versioned `Y.XmlFragment('milkdown')` to Yjs.
@@ -43,6 +51,7 @@ The current editor renders exact `mermaid` fences through Crepe's existing code 
 5. Standalone fallback continues to save through `baseRevisionId` and stale-write rejection.
 6. Vditor remains read-only. Mermaid support in Vditor-based views must be configured as sanitized rendering rather than made writable.
 7. Visual node/connector editing must deterministically rewrite the same Mermaid source node and fall back to source mode for unsupported syntax; it must never introduce parallel writable graph state.
+8. Browser and server install the same math parser and ProseMirror node contract so authoritative checkpoints preserve formula semantics.
 
 ## Security And Resource Limits
 
@@ -54,6 +63,7 @@ The current editor renders exact `mermaid` fences through Crepe's existing code 
 - Cancel or ignore stale asynchronous renders when source changes or a node unmounts.
 - Do not log Markdown or Mermaid source in errors or telemetry.
 - Preserve the current 2 MiB revision boundary; introduce a smaller per-diagram limit before enabling Mermaid publicly.
+- Use local KaTeX with `trust: false`, strict errors, and a 64 KiB source limit per formula; never invoke Vditor's CDN math renderer.
 
 ## Implementation Phases
 
@@ -61,7 +71,7 @@ The current editor renders exact `mermaid` fences through Crepe's existing code 
 
 - Create one shared Crepe configuration used by collaborative and standalone editors.
 - Explicitly enable the supported rich features instead of relying on library defaults.
-- Keep AI, image blocks, and LaTeX disabled until their storage/security requirements are designed.
+- Keep AI and image blocks disabled until their storage/security requirements are designed. KaTeX support is complete with a shared browser/server schema and local-only rendering.
 - Add source-level or adapter tests proving both editor modes use the same profile.
 - Extend the server Markdown round-trip corpus to include horizontal rules, nested lists, task lists, tables, code language metadata, and a Mermaid fence.
 
@@ -157,3 +167,6 @@ Completed with one shared rich GFM/nine-family Mermaid corpus, real browser and 
 - [x] Phase 4: Add strict Mermaid rendering to history/public previews.
 - [x] Phase 4A: Add source-backed visual flowchart editing.
 - [x] Phase 5: Complete compatibility, security, performance, and visual gates.
+- [x] Math: Enable inline and display KaTeX in collaborative and standalone editors.
+- [x] Math: Preserve formula source through browser/server codecs, Yjs convergence, checkpoints, and reload.
+- [x] Math: Render formulas locally in history/public views with security and resource bounds.

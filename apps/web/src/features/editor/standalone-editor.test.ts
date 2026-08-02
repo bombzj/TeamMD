@@ -1,6 +1,6 @@
 import { waitFor } from '@testing-library/react';
 import { markdownCompatibilityCorpus } from '@teammd/contracts';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   browserConfig: { mermaidRenderingEnabled: true },
@@ -68,12 +68,18 @@ graph TD
 \`\`\`
 `;
 
-const mountedEditors: Array<{ destroy: () => void }> = [];
+const mountedEditors: Array<{ destroy: () => Promise<void> | void }> = [];
 
-afterEach(() => {
+afterEach(async () => {
   mocks.browserConfig.mermaidRenderingEnabled = true;
-  mountedEditors.splice(0).forEach((editor) => editor.destroy());
+  for (const editor of mountedEditors.splice(0)) {
+    await editor.destroy();
+  }
   document.body.replaceChildren();
+});
+
+afterAll(async () => {
+  await new Promise((resolve) => window.setTimeout(resolve, 3_100));
 });
 
 describe('standalone editor rich features', () => {
@@ -189,9 +195,36 @@ describe('standalone editor rich features', () => {
     expect(host.querySelector('.mermaid-preview-svg')).toBeNull();
   });
 
+  it('renders KaTeX while preserving canonical inline and display source', async () => {
+    const host = mountHost();
+    const content = `Inline $E = mc^2$.
+
+$$
+\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+$$`;
+    const editor = await createStandaloneEditor({
+      content,
+      editorHost: host,
+      readOnly: false,
+      onContentChange: () => {},
+    });
+    mountedEditors.push(editor);
+
+    expect(host.querySelector('[data-type="math_inline"] .katex')).toBeTruthy();
+    expect(
+      host.querySelector('.milkdown-code-block .katex-display'),
+    ).toBeTruthy();
+    expect(editor.getContent()).toContain('$E = mc^2$');
+    expect(editor.getContent()).toContain(
+      '$$\n\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\n$$',
+    );
+    expect(editor.getContent()).not.toContain('<math');
+    expect(editor.getContent()).not.toContain('katex');
+  });
+
   it.each(markdownCompatibilityCorpus)(
     'stabilizes the shared $name corpus through browser parse/serialize/parse',
-    async ({ markdown, mermaidSources }) => {
+    async ({ markdown, mathSources, mermaidSources }) => {
       const firstHost = mountHost();
       const firstEditor = await createStandaloneEditor({
         content: markdown,
@@ -212,6 +245,9 @@ describe('standalone editor rich features', () => {
       mountedEditors.push(secondEditor);
 
       expect(secondEditor.getContent()).toBe(serialized);
+      mathSources.forEach((source) => {
+        expect(serialized).toContain(source);
+      });
       mermaidSources.forEach((source) => {
         expect(serialized).toContain(`\`\`\`mermaid\n${source}\n\`\`\``);
       });

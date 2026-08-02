@@ -11,6 +11,7 @@ import {
   editorCodeLanguages,
   editorBlockEditConfig,
   editorFeatureProfile,
+  editorLatexConfig,
   editorTopBarConfig,
   enhanceEditorAccessibility,
   mermaidStarterSource,
@@ -54,7 +55,7 @@ describe('editor feature profile', () => {
     );
   });
 
-  it('explicitly enables supported rich editing and disables unplanned features', () => {
+  it('enables local KaTeX rendering while keeping unplanned features disabled', () => {
     expect(editorFeatureProfile).toEqual({
       [Crepe.Feature.BlockEdit]: true,
       [Crepe.Feature.CodeMirror]: true,
@@ -67,7 +68,14 @@ describe('editor feature profile', () => {
       [Crepe.Feature.TopBar]: true,
       [Crepe.Feature.AI]: false,
       [Crepe.Feature.ImageBlock]: false,
-      [Crepe.Feature.Latex]: false,
+      [Crepe.Feature.Latex]: true,
+    });
+    expect(editorLatexConfig).toEqual({
+      katexOptions: {
+        strict: 'error',
+        throwOnError: false,
+        trust: false,
+      },
     });
   });
 
@@ -146,6 +154,7 @@ describe('editor feature profile', () => {
         <span class="link-remove-button"></span>
       </div>
       <div class="milkdown-link-edit">
+        <input class="input-area" />
         <span class="confirm"></span>
       </div>
     `;
@@ -166,6 +175,9 @@ describe('editor feature profile', () => {
     expect([...controls].map((control) => control.tabIndex)).toEqual([
       0, 0, 0, 0, 0,
     ]);
+    const linkInput = root.querySelector<HTMLInputElement>('.input-area');
+    expect(linkInput?.ariaLabel).toBe('Link URL');
+    expect(linkInput?.name).toBe('link-url');
 
     controls[0]?.dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }),

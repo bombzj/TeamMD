@@ -2,9 +2,11 @@ import Vditor from 'vditor';
 import { useEffect, useRef } from 'react';
 
 import { browserConfig } from '../../lib/browser-config.js';
+import { renderKatex } from './katex-renderer.js';
 import { createMermaidPreviewRenderer } from './mermaid-preview.js';
 
 const staticMermaidSourceClass = 'teammd-static-mermaid-source';
+const staticMathSourceClass = 'teammd-static-math-source';
 
 export function MarkdownPreview({
   content,
@@ -31,10 +33,11 @@ export function MarkdownPreview({
       if (!active) return;
       if (!browserConfig.mermaidRenderingEnabled) {
         restoreStaticMermaidSources(detachedHost);
-        host.replaceChildren(...detachedHost.childNodes);
-        return;
       }
-      const diagrams = prepareStaticMermaidPreviews(detachedHost);
+      const diagrams = browserConfig.mermaidRenderingEnabled
+        ? prepareStaticMermaidPreviews(detachedHost)
+        : [];
+      prepareStaticMathPreviews(detachedHost);
       host.replaceChildren(...detachedHost.childNodes);
       diagrams.forEach(({ source, target }) => {
         mermaidPreview.renderPreview('mermaid', source, (value) => {
@@ -78,7 +81,22 @@ function preserveStaticMermaidSources(html: string): string {
     code.classList.remove('language-mermaid');
     code.classList.add(staticMermaidSourceClass);
   });
+  template.content.querySelectorAll('.language-math').forEach((math) => {
+    math.classList.remove('language-math');
+    math.classList.add(staticMathSourceClass);
+  });
   return template.innerHTML;
+}
+
+function prepareStaticMathPreviews(host: HTMLElement): void {
+  host.querySelectorAll(`.${staticMathSourceClass}`).forEach((math) => {
+    const source = math.textContent?.trim() ?? '';
+    const container = math.closest('pre');
+    const displayMode = math.tagName === 'DIV' || container !== null;
+    const rendered = renderKatex(source, displayMode);
+    rendered.setAttribute('aria-label', `Formula: ${source}`);
+    (container ?? math).replaceWith(rendered);
+  });
 }
 
 function prepareStaticMermaidPreviews(host: HTMLElement): Array<{

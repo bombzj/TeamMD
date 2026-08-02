@@ -16,6 +16,13 @@ import {
 } from 'y-prosemirror';
 import * as Y from 'yjs';
 
+import {
+  blockLatexSchema,
+  mathInlineSchema,
+  remarkMathBlockPlugin,
+  remarkMathPlugin,
+} from './milkdown-math.js';
+
 export const milkdownFragmentName = 'milkdown';
 
 export type MilkdownCodec = {
@@ -43,6 +50,10 @@ async function createMilkdownCodec(): Promise<MilkdownCodec> {
     })
     .use(commonmark)
     .use(gfm)
+    .use(remarkMathPlugin)
+    .use(remarkMathBlockPlugin)
+    .use(mathInlineSchema)
+    .use(blockLatexSchema)
     .create();
   const values = editor.action((context) => ({
     parser: context.get(parserCtx),

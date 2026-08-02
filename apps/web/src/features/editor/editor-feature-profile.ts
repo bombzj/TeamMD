@@ -15,6 +15,7 @@ import {
 } from '@milkdown/kit/preset/commonmark';
 
 import { browserConfig } from '../../lib/browser-config.js';
+import { teamMdKatexOptions } from './katex-renderer.js';
 import { createMermaidPreviewRenderer } from './mermaid-preview.js';
 import {
   connectVisualMermaidEditor,
@@ -33,6 +34,7 @@ const topBarControlNames = [
   'Link',
   'Table',
   'Code block',
+  'Math block',
   'Diagram',
   'Blockquote',
   'Horizontal rule',
@@ -43,6 +45,7 @@ const selectionToolbarControlNames = [
   'Italic',
   'Strikethrough',
   'Inline code',
+  'Inline math',
   'Link',
 ] as const;
 
@@ -65,8 +68,12 @@ export const editorFeatureProfile = {
   [Crepe.Feature.TopBar]: true,
   [Crepe.Feature.AI]: false,
   [Crepe.Feature.ImageBlock]: false,
-  [Crepe.Feature.Latex]: false,
+  [Crepe.Feature.Latex]: true,
 } satisfies NonNullable<CrepeConfig['features']>;
+
+export const editorLatexConfig = {
+  katexOptions: teamMdKatexOptions,
+} as const;
 
 const mermaidLanguage = LanguageDescription.of({
   name: 'mermaid',
@@ -162,11 +169,12 @@ export function createTeamMdEditor(
       [Crepe.Feature.BlockEdit]: editorBlockEditConfig,
       [Crepe.Feature.CodeMirror]: {
         languages: editorCodeLanguages,
-        previewLabel: 'Diagram preview',
+        previewLabel: 'Rendered preview',
         renderLanguage: (language) =>
           language === 'mermaid' ? 'Mermaid' : language,
         renderPreview,
       },
+      [Crepe.Feature.Latex]: editorLatexConfig,
       [Crepe.Feature.TopBar]: editorTopBarConfig,
     },
     ...(defaultValue === undefined ? {} : { defaultValue }),
@@ -262,6 +270,11 @@ export function enhanceEditorAccessibility(root: HTMLElement): () => void {
       root.querySelector<HTMLElement>('.milkdown-link-edit .confirm'),
       'Confirm link',
     );
+    const linkInput = root.querySelector<HTMLInputElement>(
+      '.milkdown-link-edit .input-area',
+    );
+    labelNativeControl(linkInput, 'Link URL');
+    if (linkInput !== null) linkInput.name = 'link-url';
     labelNativeControl(
       root.querySelector<HTMLInputElement>(
         '.milkdown-code-block .language-picker .search-input',

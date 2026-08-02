@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   destroy: vi.fn(),
   preview: vi.fn(),
   renderPreview: vi.fn(),
+  renderKatex: vi.fn(),
 }));
 
 vi.mock('../../lib/browser-config.js', () => ({
@@ -21,6 +22,10 @@ vi.mock('./mermaid-preview.js', () => ({
     destroy: mocks.destroy,
     renderPreview: mocks.renderPreview,
   }),
+}));
+
+vi.mock('./katex-renderer.js', () => ({
+  renderKatex: mocks.renderKatex,
 }));
 
 import { MarkdownPreview } from './MarkdownPreview.js';
@@ -119,6 +124,42 @@ describe('MarkdownPreview', () => {
     expect(container.querySelector('code.language-mermaid')).toBeTruthy();
     expect(container.querySelector('.static-mermaid-preview')).toBeNull();
     expect(mocks.renderPreview).not.toHaveBeenCalled();
+  });
+
+  it('renders inline and display formulas locally after sanitized conversion', async () => {
+    mocks.preview.mockImplementation(
+      (
+        host: HTMLElement,
+        _content: string,
+        options: { transform: (html: string) => string },
+      ) => {
+        host.innerHTML = options.transform(`
+          <p>Energy <span class="language-math">E = mc^2</span></p>
+          <pre><code class="language-math">\\ce{H2O}</code></pre>
+        `);
+        return Promise.resolve();
+      },
+    );
+    mocks.renderKatex.mockImplementation(
+      (source: string, displayMode: boolean) => {
+        const output = document.createElement(displayMode ? 'div' : 'span');
+        output.textContent = `Rendered ${source}`;
+        return output;
+      },
+    );
+
+    const { container } = render(
+      <MarkdownPreview content={'Energy $E = mc^2$\n\n$$\n\\ce{H2O}\n$$'} />,
+    );
+
+    expect(await screen.findByText('Rendered E = mc^2')).toBeTruthy();
+    expect(screen.getByText('Rendered \\ce{H2O}')).toBeTruthy();
+    expect(mocks.renderKatex).toHaveBeenNthCalledWith(1, 'E = mc^2', false);
+    expect(mocks.renderKatex).toHaveBeenNthCalledWith(2, '\\ce{H2O}', true);
+    expect(container.querySelector('.language-math')).toBeNull();
+    expect(
+      container.querySelector(`.${'teammd-static-math-source'}`),
+    ).toBeNull();
   });
 
   it('keeps the surrounding document available when a diagram is invalid', async () => {

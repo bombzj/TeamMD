@@ -5,6 +5,7 @@ import '@fontsource/newsreader/latin-500.css';
 import '@fontsource/newsreader/latin-600.css';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
+import 'katex/dist/katex.min.css';
 import 'vditor/dist/index.css';
 import './styles/global.css';
 
