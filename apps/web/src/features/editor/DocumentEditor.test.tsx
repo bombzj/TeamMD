@@ -8,6 +8,7 @@ const collaboration = vi.hoisted(() => ({
   content: '',
   creationCount: 0,
   creationError: null as Error | null,
+  initialContent: null as string | null,
   options: null as null | {
     onContentChange: (content: string) => void;
     onRestore: () => void;
@@ -35,7 +36,8 @@ vi.mock('./collaborative-editor.js', () => ({
     }
     collaboration.creationCount += 1;
     if (collaboration.content.length === 0) {
-      collaboration.content = documentResponse.content;
+      collaboration.content =
+        collaboration.initialContent ?? documentResponse.content;
     }
     collaboration.options = options;
     options.onTransportChange('synced');
@@ -101,6 +103,7 @@ afterEach(() => {
   collaboration.content = '';
   collaboration.creationCount = 0;
   collaboration.creationError = null;
+  collaboration.initialContent = null;
   collaboration.options = null;
   collaboration.prepareCheckpoint.mockClear();
   collaboration.redo.mockClear();
@@ -353,6 +356,73 @@ describe('DocumentEditor', () => {
 
     expect(collaboration.undo).toHaveBeenCalledOnce();
     expect(collaboration.redo).toHaveBeenCalledOnce();
+  });
+
+  it('marks the first edit in an authoritative empty room as unsaved', async () => {
+    collaboration.initialContent = '';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url === `/api/v1/documents/${documentId}`) {
+          return Promise.resolve(
+            jsonResponse({ ...documentResponse, content: '' }),
+          );
+        }
+        if (url.endsWith('/collaboration-ticket')) {
+          return Promise.resolve(jsonResponse(collaborationTicket()));
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      }),
+    );
+    renderEditor();
+
+    const saveButton = await screen.findByRole('button', { name: 'Save' });
+    expect(saveButton.hasAttribute('disabled')).toBe(true);
+    act(() => {
+      collaboration.content = '# Pasted content\n';
+      collaboration.options?.onContentChange(collaboration.content);
+    });
+
+    expect(saveButton.hasAttribute('disabled')).toBe(false);
+    expect(screen.getByText('Not saved to history')).toBeTruthy();
+  });
+
+  it('shows and copies the current canonical Markdown without replacing the editor', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url === `/api/v1/documents/${documentId}`) {
+          return Promise.resolve(jsonResponse(documentResponse));
+        }
+        if (url.endsWith('/collaboration-ticket')) {
+          return Promise.resolve(jsonResponse(collaborationTicket()));
+        }
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      }),
+    );
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText');
+    renderEditor();
+    await screen.findByRole('heading', { name: 'Readme.md' });
+    const updatedContent = '# Current draft\n\n$1 \\le N$\n';
+    act(() => {
+      collaboration.content = updatedContent;
+      collaboration.options?.onContentChange(updatedContent);
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Show Markdown source' }),
+    );
+    expect(screen.getByLabelText('Markdown source').textContent).toContain(
+      updatedContent,
+    );
+    expect(collaboration.creationCount).toBe(1);
+    await user.click(screen.getByRole('button', { name: 'Copy Markdown' }));
+
+    expect(writeText).toHaveBeenCalledWith(updatedContent);
+    expect(collaboration.creationCount).toBe(1);
   });
 
   it('lets owners grant an existing account editor access', async () => {

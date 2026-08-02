@@ -30,6 +30,8 @@ export async function createStandaloneEditor(
     undo: () => runHistoryShortcut(options.editorHost, 'undo'),
     redo: () => runHistoryShortcut(options.editorHost, 'redo'),
     prepareCheckpoint: () => Promise.resolve(),
-    destroy: () => void editor.destroy(),
+    destroy: async () => {
+      await editor.destroy();
+    },
   };
 }

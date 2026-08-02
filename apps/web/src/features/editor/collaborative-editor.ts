@@ -31,7 +31,7 @@ type CollaborativeEditorOptions = {
 };
 
 export type CollaborativeEditor = {
-  destroy: () => void;
+  destroy: () => Promise<void> | void;
   getContent: () => string;
   prepareCheckpoint: () => Promise<void>;
   redo: () => boolean;
@@ -48,7 +48,7 @@ export async function createCollaborativeEditor(
   let readOnly = initialTicket.permission === 'viewer';
   let nextTicket: CollaborationTicketResponse | null = initialTicket;
   let crepe: Crepe | null = null;
-  let currentContent = '';
+  let currentContent: string | null = null;
   let contentTimer: number | undefined;
   let destroyed = false;
   const yDocument = new Y.Doc();
@@ -163,7 +163,7 @@ export async function createCollaborativeEditor(
   }
 
   return {
-    getContent: () => currentContent,
+    getContent: () => currentContent ?? crepe?.getMarkdown() ?? '',
     undo: () => runHistoryShortcut(options.editorHost, 'undo'),
     redo: () => runHistoryShortcut(options.editorHost, 'redo'),
     prepareCheckpoint: async () => {
@@ -194,14 +194,14 @@ export async function createCollaborativeEditor(
         if (!provider.hasUnsyncedChanges) handleUnsyncedChanges({ number: 0 });
       });
     },
-    destroy: () => {
+    destroy: async () => {
       destroyed = true;
       window.clearTimeout(syncTimeout);
       window.clearTimeout(contentTimer);
       xmlFragment.unobserveDeep(handleXmlChange);
-      provider.destroy();
-      if (crepe !== null) void crepe.destroy();
+      if (crepe !== null) await crepe.destroy();
       crepe = null;
+      provider.destroy();
       yDocument.destroy();
     },
   };

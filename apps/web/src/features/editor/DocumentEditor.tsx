@@ -11,6 +11,7 @@ import {
   Check,
   Cloud,
   CloudOff,
+  Code2,
   Copy,
   History,
   Link,
@@ -75,6 +76,8 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const [participantCount, setParticipantCount] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sourceVisible, setSourceVisible] = useState(false);
+  const [markdownCopied, setMarkdownCopied] = useState(false);
   const [fullScreen, setFullScreen] = useState(false);
   const [saveMessageOpen, setSaveMessageOpen] = useState(false);
   const [sharingOpen, setSharingOpen] = useState(false);
@@ -284,7 +287,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     }).then(
       (createdEditor) => {
         if (!active) {
-          createdEditor.destroy();
+          void createdEditor.destroy();
           return;
         }
         editor = createdEditor;
@@ -305,7 +308,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         }).then(
           (standaloneEditor) => {
             if (!active) {
-              standaloneEditor.destroy();
+              void standaloneEditor.destroy();
               return;
             }
             editor = standaloneEditor;
@@ -327,7 +330,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     return () => {
       active = false;
       editorRef.current = null;
-      editor?.destroy();
+      if (editor !== null) void editor.destroy();
     };
   }, [documentId, documentQuery.isSuccess, editorGeneration]);
 
@@ -401,6 +404,17 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     !readOnly &&
     !saveMutation.isPending;
 
+  const copyMarkdown = async () => {
+    const markdown = editorRef.current?.getContent() ?? content;
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setMarkdownCopied(true);
+      window.setTimeout(() => setMarkdownCopied(false), 1_500);
+    } catch {
+      setNotice('Could not copy Markdown.');
+    }
+  };
+
   return (
     <main
       className={`document-editor-shell${fullScreen ? ' full-screen' : ''}`}
@@ -445,6 +459,29 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             onClick={() => setFullScreen((current) => !current)}
           >
             {fullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={
+              sourceVisible ? 'Show rendered editor' : 'Show Markdown source'
+            }
+            aria-pressed={sourceVisible}
+            title={
+              sourceVisible ? 'Show rendered editor' : 'Show Markdown source'
+            }
+            onClick={() => setSourceVisible((current) => !current)}
+          >
+            <Code2 size={18} />
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Copy Markdown"
+            title={markdownCopied ? 'Markdown copied' : 'Copy Markdown'}
+            onClick={() => void copyMarkdown()}
+          >
+            {markdownCopied ? <Check size={18} /> : <Copy size={18} />}
           </button>
           {!readOnly && (
             <div className="editor-history-controls" aria-label="Edit history">
@@ -519,9 +556,21 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
       <section
         className="editor-canvas"
         aria-label="Collaborative Markdown editor"
+        hidden={sourceVisible}
       >
         <div ref={editorHostRef} className="milkdown-host" />
       </section>
+      {sourceVisible && (
+        <section className="editor-source" aria-label="Markdown source">
+          <div className="editor-source-heading">
+            <span>Markdown source</span>
+            <span>Read only</span>
+          </div>
+          <pre>
+            <code>{content}</code>
+          </pre>
+        </section>
+      )}
       <footer className="editor-footer">
         <span>Revision {revisionOrdinal}</span>
         <span>{content.length.toLocaleString()} characters</span>

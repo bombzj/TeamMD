@@ -58,6 +58,8 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-018:** Operators can disable derived Mermaid rendering and visual controls through validated browser configuration without rewriting or hiding Mermaid source, revisions, or collaboration state.
 - **REQ-EDIT-019:** Editors can create and edit portable inline `$...$` and display `$$...$$` formulas rendered locally with KaTeX, including the local `mhchem` extension. Formula source remains the only writable, collaborative, saved, and exported representation; generated KaTeX HTML and MathML are disposable UI.
 - **REQ-EDIT-020:** History and public views render saved formulas locally without loading renderer scripts from a CDN. Untrusted KaTeX commands cannot create links or executable DOM, oversized formulas show a bounded local error, and wide display formulas scroll within their preview without causing page overflow.
+- **REQ-EDIT-021:** An authorized user can inspect the current canonical Markdown in a read-only whole-document source view and copy it as plain text. Switching views does not recreate Milkdown or introduce a parallel writable document root.
+- **REQ-EDIT-022:** The first local edit to an authoritative empty collaboration room, including pasted Markdown, immediately marks the draft unsaved and enables Save. Static history/public rendering recognizes inline formulas whose source begins with a digit under the same bounded local KaTeX policy.
 
 ### Sharing
 

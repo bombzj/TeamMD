@@ -8,6 +8,8 @@ Make TeamMD's Milkdown editor feel complete for everyday Markdown authoring whil
 
 Crepe enables these features in both collaborative and standalone modes: selection toolbar, slash/block editing, headings, bold, emphasis, strikethrough, links, bullet and ordered lists, task lists, blockquotes, tables, fenced code blocks with CodeMirror, placeholders, cursor support, and local KaTeX rendering for inline/display formulas. TeamMD explicitly enables Crepe's top bar and LaTeX feature while disabling AI and image blocks.
 
+The document header also exposes a read-only whole-document Markdown source view and a copy-as-text command. Both read canonical Markdown from the active adapter while Milkdown remains mounted as the only writable Yjs-bound surface. Empty authoritative rooms publish their initial empty state so the first paste is classified as a local unsaved edit.
+
 The current editor renders exact `mermaid` fences through Crepe's existing code preview while keeping fenced source authoritative. Static history and public views intercept Vditor's bundled Mermaid path and use the same bounded TeamMD renderer from preserved code text. Supported flowcharts expose transient source-backed visual controls; all other syntax remains preview/source-only. Browser/server compatibility, collaboration, accessibility, rendering rollback, performance smoke, and desktop/mobile visual gates are covered by the implementation and tests described below.
 
 ## Product Requirements
@@ -39,6 +41,8 @@ The current editor renders exact `mermaid` fences through Crepe's existing code 
 - Inline `$...$` and display `$$...$$` formula source is the only writable, collaborative, saved, and exported representation.
 - The editor, immutable history, and public views render formulas locally with pinned KaTeX and the local `mhchem` extension.
 - KaTeX HTML and MathML are disposable UI and never enter Yjs, revisions, APIs, exports, or persistence.
+- Static rendering enables digit-leading inline formula parsing, including bounds such as `$1 \\le N \\le 10^5$`, before local KaTeX interception.
+- Inline formula editing uses a compact source popover sized to the formula rather than the document width.
 - Invalid or oversized formulas show a local bounded result without changing surrounding content.
 - Wide display formulas scroll within their own preview and do not cause page overflow.
 
@@ -170,3 +174,6 @@ Completed with one shared rich GFM/nine-family Mermaid corpus, real browser and 
 - [x] Math: Enable inline and display KaTeX in collaborative and standalone editors.
 - [x] Math: Preserve formula source through browser/server codecs, Yjs convergence, checkpoints, and reload.
 - [x] Math: Render formulas locally in history/public views with security and resource bounds.
+- [x] Editor: Add read-only whole-document Markdown source and copy-as-text controls without creating a second writable root.
+- [x] Editor: Mark the first paste into an authoritative empty collaboration room as unsaved.
+- [x] Math: Render digit-leading inline formulas in immutable history/public views and compact the inline formula edit popover.

@@ -162,6 +162,21 @@ describe('MarkdownPreview', () => {
     ).toBeNull();
   });
 
+  it('enables digit-leading inline formulas in static history rendering', async () => {
+    mocks.preview.mockResolvedValue(undefined);
+
+    render(<MarkdownPreview content={'Limits: $1 \\le N \\le 10^5$'} />);
+
+    await waitFor(() => expect(mocks.preview).toHaveBeenCalledOnce());
+    expect(mocks.preview).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      'Limits: $1 \\le N \\le 10^5$',
+      expect.objectContaining({
+        math: { inlineDigit: true },
+      }),
+    );
+  });
+
   it('keeps the surrounding document available when a diagram is invalid', async () => {
     mocks.preview.mockImplementation(
       (

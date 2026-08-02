@@ -104,14 +104,14 @@ function buildCodec(
     },
     parse: parser,
     read(document) {
-      return serializer(
+      return serializeDocument(
         yXmlFragmentToProseMirrorRootNode(
           document.getXmlFragment(milkdownFragmentName),
           schema,
         ),
       );
     },
-    serialize: serializer,
+    serialize: serializeDocument,
     write(document, markdown) {
       write(document, parser(markdown));
     },
@@ -123,6 +123,19 @@ function buildCodec(
       if (fragment.length > 0) fragment.delete(0, fragment.length);
       prosemirrorToYXmlFragment(parsed, fragment);
     });
+  }
+
+  function serializeDocument(document: Node): string {
+    const children: Node[] = [];
+    document.forEach((child) => children.push(child));
+    while (
+      children.at(-1)?.type === schema.nodes.paragraph &&
+      children.at(-1)?.content.size === 0
+    ) {
+      children.pop();
+    }
+    if (children.length === 0) return '';
+    return serializer(document.type.create(document.attrs, children));
   }
 }
 

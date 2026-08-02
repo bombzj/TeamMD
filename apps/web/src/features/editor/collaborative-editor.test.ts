@@ -23,6 +23,9 @@ describe('collaborative editor rendering', () => {
 
     expect(editorSource).toContain("getXmlFragment('milkdown')");
     expect(editorSource).toContain('.bindXmlFragment(');
+    expect(editorSource.indexOf('await crepe.destroy()')).toBeLessThan(
+      editorSource.lastIndexOf('provider.destroy()'),
+    );
     expect(editorSource).not.toContain('mermaid');
     expect(featureProfileSource).toContain(
       'const boundedPreview = createMermaidPreviewRenderer();',
@@ -43,6 +46,11 @@ describe('collaborative editor rendering', () => {
     expect(globalStyles).toContain(
       '.milkdown-host .ProseMirror-yjs-cursor > div {',
     );
+    expect(globalStyles).toContain(
+      '.milkdown-host .milkdown-latex-inline-edit .ProseMirror {',
+    );
+    expect(globalStyles).toContain('min-height: 24px;');
+    expect(globalStyles).toContain('overflow-x: auto;');
     const editorShellRule = globalStyles.match(
       /\.document-editor-shell \{(?<declarations>[^}]*)\}/u,
     )?.groups?.declarations;

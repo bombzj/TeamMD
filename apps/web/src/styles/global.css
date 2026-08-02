@@ -1199,6 +1199,36 @@ body.editor-full-screen-open {
   background: white;
   box-shadow: 0 15px 45px rgba(35, 34, 31, 0.08);
 }
+.editor-source {
+  width: min(1080px, calc(100% - 48px));
+  min-height: min(680px, calc(100vh - 190px));
+  margin: 28px auto;
+  border: 1px solid var(--line);
+  color: #ede9df;
+  background: #252724;
+  box-shadow: 0 15px 45px rgba(35, 34, 31, 0.08);
+}
+.editor-source-heading {
+  display: flex;
+  border-bottom: 1px solid #4b4e48;
+  padding: 11px 18px;
+  align-items: center;
+  justify-content: space-between;
+  color: #b9beb3;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.editor-source pre {
+  margin: 0;
+  padding: 30px 34px 64px;
+  overflow: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 .milkdown-host {
   min-width: 0;
   min-height: inherit;
@@ -1225,6 +1255,17 @@ body.editor-full-screen-open {
   --crepe-font-default: 'IBM Plex Sans', sans-serif;
   --crepe-shadow-1: 0 5px 18px rgba(35, 34, 31, 0.14);
   --crepe-shadow-2: 0 10px 30px rgba(35, 34, 31, 0.18);
+}
+.milkdown-host .milkdown-latex-inline-edit .ProseMirror {
+  width: max-content;
+  min-width: 0;
+  max-width: min(28ch, calc(100vw - 120px));
+  min-height: 24px;
+  padding: 0;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 24px;
+  white-space: pre;
 }
 .milkdown-host .milkdown-top-bar {
   border-color: var(--line);
@@ -2070,12 +2111,16 @@ body.editor-full-screen-open {
   .revision-conflict .secondary-button {
     grid-column: 1 / -1;
   }
-  .editor-canvas {
+  .editor-canvas,
+  .editor-source {
     width: 100%;
     margin: 0;
     border-width: 0 0 1px;
     box-shadow: none;
     min-height: max(440px, calc(100vh - 220px));
+  }
+  .editor-source pre {
+    padding: 24px 20px 56px;
   }
   .milkdown-host .ProseMirror {
     min-height: max(440px, calc(100vh - 220px));

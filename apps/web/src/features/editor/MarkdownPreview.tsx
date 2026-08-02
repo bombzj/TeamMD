@@ -26,6 +26,7 @@ export function MarkdownPreview({
 
     void Vditor.preview(detachedHost, content, {
       cdn: '/vditor',
+      math: { inlineDigit: true },
       mode: 'light',
       markdown: { sanitize: true },
       transform: preserveStaticMermaidSources,
