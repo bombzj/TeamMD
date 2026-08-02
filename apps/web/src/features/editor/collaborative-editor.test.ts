@@ -56,5 +56,6 @@ describe('collaborative editor rendering', () => {
     )?.groups?.declarations;
     expect(editorShellRule).toContain('display: block;');
     expect(editorShellRule).not.toContain('grid-template-rows');
+    expect(globalStyles).toContain('padding: 32px 20px 64px 86px;');
   });
 });

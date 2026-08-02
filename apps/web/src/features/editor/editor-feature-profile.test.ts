@@ -14,6 +14,7 @@ import {
   editorLatexConfig,
   editorTopBarConfig,
   enhanceEditorAccessibility,
+  isBlockHandleTarget,
   mermaidStarterSource,
 } from './editor-feature-profile.js';
 
@@ -77,6 +78,17 @@ describe('editor feature profile', () => {
         trust: false,
       },
     });
+  });
+
+  it('anchors the block handle to paragraphs instead of inline math', () => {
+    const pos = {} as never;
+
+    expect(
+      isBlockHandleTarget(pos, { type: { name: 'math_inline' } } as never),
+    ).toBe(false);
+    expect(
+      isBlockHandleTarget(pos, { type: { name: 'paragraph' } } as never),
+    ).toBe(true);
   });
 
   it('is shared by collaborative and standalone editor adapters', async () => {

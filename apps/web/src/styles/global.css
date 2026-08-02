@@ -2124,7 +2124,7 @@ body.editor-full-screen-open {
   }
   .milkdown-host .ProseMirror {
     min-height: max(440px, calc(100vh - 220px));
-    padding: 32px 20px 64px;
+    padding: 32px 20px 64px 86px;
   }
 }
 

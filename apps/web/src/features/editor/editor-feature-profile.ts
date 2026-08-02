@@ -9,10 +9,13 @@ import type { BlockEditFeatureConfig } from '@milkdown/crepe/feature/block-edit'
 import type { TopBarFeatureConfig } from '@milkdown/crepe/feature/top-bar';
 import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
 import type { Ctx } from '@milkdown/kit/ctx';
+import type { Node, ResolvedPos } from '@milkdown/kit/prose/model';
+import { blockConfig } from '@milkdown/kit/plugin/block';
 import {
   addBlockTypeCommand,
   codeBlockSchema,
 } from '@milkdown/kit/preset/commonmark';
+import { findParent } from '@milkdown/kit/prose';
 
 import { browserConfig } from '../../lib/browser-config.js';
 import { teamMdKatexOptions } from './katex-renderer.js';
@@ -120,6 +123,13 @@ export const editorTopBarConfig = {
   },
 } satisfies TopBarFeatureConfig;
 
+export function isBlockHandleTarget(pos: ResolvedPos, node: Node): boolean {
+  if (node.type.name === 'math_inline') return false;
+  return !findParent((parent) =>
+    ['table', 'blockquote', 'math_inline'].includes(parent.type.name),
+  )(pos);
+}
+
 function insertMermaidDiagram(ctx: Ctx): void {
   const commands = ctx.get(commandsCtx);
   const codeBlock = codeBlockSchema.type(ctx);
@@ -178,6 +188,9 @@ export function createTeamMdEditor(
       [Crepe.Feature.TopBar]: editorTopBarConfig,
     },
     ...(defaultValue === undefined ? {} : { defaultValue }),
+  });
+  editor.editor.config((ctx) => {
+    ctx.set(blockConfig.key, { filterNodes: isBlockHandleTarget });
   });
   const disconnectVisualEditor = connectVisualMermaidEditor(
     root,

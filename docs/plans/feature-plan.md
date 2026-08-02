@@ -19,7 +19,7 @@ The current editor renders exact `mermaid` fences through Crepe's existing code 
 - Editors can insert and edit headings, paragraphs, emphasis, strong text, strikethrough, links, blockquotes, horizontal rules, bullet lists, ordered lists, task lists, tables, inline code, and fenced code blocks without leaving the rendered editor.
 - The same supported feature profile is used in collaborative and standalone fallback modes.
 - Viewers remain read-only and do not see controls that imply write access.
-- Toolbar and slash-command actions remain keyboard accessible and do not obscure document content on desktop or mobile.
+- Toolbar, slash-command, and block-handle actions remain keyboard accessible and do not obscure document content on desktop or mobile. Block handles anchor to containing blocks rather than inline formula atoms, with a reserved narrow-layout gutter.
 - The complete editor can enter and exit a distraction-free full-screen layout without remounting the collaborative editor or losing draft state.
 - The editor scrolls through the complete document, including a final diagram, with clear end spacing; the revision/character/save-state footer follows the actual document end instead of overlapping content or floating above it.
 - Unsupported or lossy Markdown is never silently normalized into a different meaning.
@@ -177,3 +177,4 @@ Completed with one shared rich GFM/nine-family Mermaid corpus, real browser and 
 - [x] Editor: Add read-only whole-document Markdown source and copy-as-text controls without creating a second writable root.
 - [x] Editor: Mark the first paste into an authoritative empty collaboration room as unsaved.
 - [x] Math: Render digit-leading inline formulas in immutable history/public views and compact the inline formula edit popover.
+- [x] Editor: Keep block handles anchored outside formula-rich paragraphs at desktop and narrow widths.
