@@ -18,6 +18,7 @@ import {
   trashResponseSchema,
   workspaceTreeResponseSchema,
   type AuthResponse,
+  type ChangePasswordRequest,
   type CollaborationCheckpointResponse,
   type CollaborationTicketResponse,
   type CollaboratorDto,
@@ -90,8 +91,32 @@ export async function login(input: LoginRequest): Promise<AuthResponse> {
   return data;
 }
 
+export async function changePassword(
+  input: ChangePasswordRequest,
+): Promise<AuthResponse> {
+  const data = await requestJson(
+    '/api/v1/auth/password',
+    mutation('POST', input),
+    (value) => authResponseSchema.parse(value),
+  );
+  csrfToken = data.csrfToken;
+  currentUserRequest = Promise.resolve(data);
+  return data;
+}
+
 export async function logout(): Promise<void> {
   const response = await fetch('/api/v1/auth/logout', {
+    method: 'POST',
+    credentials: 'include',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+  });
+  if (!response.ok) await throwApiError(response);
+  csrfToken = null;
+  currentUserRequest = Promise.resolve(null);
+}
+
+export async function logoutAllSessions(): Promise<void> {
+  const response = await fetch('/api/v1/auth/logout-all', {
     method: 'POST',
     credentials: 'include',
     headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},

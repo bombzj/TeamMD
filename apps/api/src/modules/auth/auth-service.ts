@@ -100,6 +100,57 @@ export class AuthService {
     });
   }
 
+  public async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    context: SessionContext,
+    requestId: string,
+  ): Promise<CreatedSession> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const valid =
+      user !== null &&
+      user.disabledAt === null &&
+      (await passwordMatches(user.passwordHash, currentPassword));
+
+    if (!valid || user === null) {
+      throw new ApiError(
+        401,
+        'INVALID_CREDENTIALS',
+        'The current password is incorrect.',
+      );
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedUser = await transaction.user.update({
+        where: { id: userId, sessionEpoch: user.sessionEpoch },
+        data: {
+          passwordHash,
+          sessionEpoch: { increment: 1 },
+        },
+      });
+      await transaction.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      const session = await this.createSession(
+        transaction,
+        updatedUser,
+        context,
+      );
+      await transaction.auditEvent.create({
+        data: {
+          actorId: userId,
+          action: 'AUTH_PASSWORD_CHANGE',
+          result: 'SUCCESS',
+          requestId,
+        },
+      });
+      return session;
+    });
+  }
+
   public async authenticate(
     sessionToken: string | undefined,
   ): Promise<AuthenticatedSession | null> {

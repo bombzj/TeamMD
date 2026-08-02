@@ -27,6 +27,7 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-AUTH-002:** A registered user can log in, log out of the current session, and log out of all sessions.
 - **REQ-AUTH-003:** Authentication failures do not reveal whether an email exists.
 - **REQ-AUTH-004:** Password reset and email verification are planned for the first public release. A private local MVP may gate them behind email infrastructure readiness.
+- **REQ-AUTH-005:** An authenticated user can change their password from account settings by confirming the current password. A successful change rotates the current session, revokes every previous session, and is audited without storing or logging either password.
 
 ### Workspace
 
@@ -35,6 +36,7 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-TREE-003:** Folder names are unique within the same owner and parent folder. Document names are unique within the same owner and parent folder, case-insensitively.
 - **REQ-TREE-004:** The tree prevents cycles, caps nesting depth, and treats shared documents as a separate virtual view rather than inserting them into the recipient's owned hierarchy.
 - **REQ-TREE-005:** Trashing a folder hides its owned descendants. Restoring or permanently deleting it applies transactionally to that subtree.
+- **REQ-TREE-006:** The authenticated workspace uses one compact navigation surface instead of a separate top banner. The TeamMD identity appears at the top of the persistent desktop sidebar, account controls appear at its bottom, and narrow layouts preserve the same actions in one non-wrapping sticky tool rail. The account menu identifies the current user and provides keyboard-accessible Settings, current-session logout, and all-session logout actions.
 
 ### Editing And Saves
 

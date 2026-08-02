@@ -1,4 +1,8 @@
-import { loginRequestSchema, registerRequestSchema } from '@teammd/contracts';
+import {
+  changePasswordRequestSchema,
+  loginRequestSchema,
+  registerRequestSchema,
+} from '@teammd/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { ApiError } from '../../lib/api-error.js';
@@ -100,6 +104,34 @@ export function registerAuthRoutes(
     );
     return reply.header('Cache-Control', 'no-store').send(result);
   });
+
+  app.post(
+    '/auth/password',
+    { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const session = requireMutationAuth(
+        request,
+        options.authService,
+        options.webOrigin,
+      );
+      const body = changePasswordRequestSchema.parse(request.body);
+      const result = await options.authService.changePassword(
+        session.user.id,
+        body.currentPassword,
+        body.newPassword,
+        requestContext(request),
+        request.id,
+      );
+      return sendCreatedSession(
+        reply,
+        result,
+        sessionCookie,
+        options.sessionTtlDays,
+        options.secureCookies,
+        200,
+      );
+    },
+  );
 
   app.post('/auth/logout', async (request, reply) => {
     const session = requireMutationAuth(

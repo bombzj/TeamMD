@@ -8,7 +8,8 @@ coverage/
 *.log
 .DS_Store
 .idea/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .tmp/
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal

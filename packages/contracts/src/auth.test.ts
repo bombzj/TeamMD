@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   authResponseSchema,
+  changePasswordRequestSchema,
   errorResponseSchema,
   loginRequestSchema,
   registerRequestSchema,
@@ -30,6 +31,25 @@ describe('authentication contracts', () => {
         email: 'person@example.com',
         password: 'correct horse battery staple',
         rememberMe: true,
+      }),
+    ).toThrow();
+  });
+
+  it('requires a different valid password when changing credentials', () => {
+    expect(
+      changePasswordRequestSchema.parse({
+        currentPassword: 'correct horse battery staple',
+        newPassword: 'another secure password phrase',
+      }),
+    ).toEqual({
+      currentPassword: 'correct horse battery staple',
+      newPassword: 'another secure password phrase',
+    });
+
+    expect(() =>
+      changePasswordRequestSchema.parse({
+        currentPassword: 'correct horse battery staple',
+        newPassword: 'correct horse battery staple',
       }),
     ).toThrow();
   });

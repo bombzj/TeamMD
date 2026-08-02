@@ -38,6 +38,9 @@ class FakeAuthService {
   public login = vi
     .fn<() => Promise<CreatedSession>>()
     .mockResolvedValue(createdSession());
+  public changePassword = vi
+    .fn<() => Promise<CreatedSession>>()
+    .mockResolvedValue(createdSession());
   public logout = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   public logoutAll = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   public revokeSession = vi
@@ -160,6 +163,36 @@ describe('authentication routes', () => {
     );
     expect(accepted.statusCode).toBe(204);
     expect(service.logout).toHaveBeenCalledOnce();
+  });
+
+  it('changes a password only with an active session and matching CSRF', async () => {
+    const service = new FakeAuthService();
+    const app = await createTestApp(service);
+    const cookie =
+      'teammd_session=session-token; teammd_csrf=' + 'a'.repeat(43);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/password',
+      headers: {
+        origin: config.webOrigin,
+        cookie,
+        'x-csrf-token': 'a'.repeat(43),
+      },
+      payload: {
+        currentPassword: 'correct horse battery staple',
+        newPassword: 'another secure password phrase',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(authResponseSchema.parse(response.json()).user).toEqual(user);
+    expect(service.changePassword).toHaveBeenCalledWith(
+      user.id,
+      'correct horse battery staple',
+      'another secure password phrase',
+      expect.objectContaining({ userAgentSummary: 'lightMyRequest' }),
+      expect.any(String),
+    );
   });
 });
 

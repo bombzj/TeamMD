@@ -31,13 +31,14 @@ Stable current codes include `VALIDATION_ERROR`, `AUTHENTICATION_REQUIRED`, `INV
 | -------- | --------------------------- | ----------------------------------------------- |
 | `POST`   | `/auth/register`            | Create user and session                         |
 | `POST`   | `/auth/login`               | Authenticate and rotate session                 |
+| `POST`   | `/auth/password`            | Change password and rotate all sessions         |
 | `POST`   | `/auth/logout`              | Revoke current session                          |
 | `POST`   | `/auth/logout-all`          | Increment session epoch and revoke all sessions |
 | `GET`    | `/auth/me`                  | Return current user and CSRF bootstrap metadata |
 | `GET`    | `/auth/sessions`            | List active sessions                            |
 | `DELETE` | `/auth/sessions/:sessionId` | Revoke one owned session                        |
 
-Registration body: `{ "email": "user@example.com", "password": "..." }`. Responses never include password hashes or session tokens. Login failures use one generic status/message.
+Registration body: `{ "email": "user@example.com", "password": "..." }`. Password change body: `{ "currentPassword": "...", "newPassword": "..." }`; both values are 12 to 128 characters and must differ. The route requires an active session, matching CSRF token, allowed origin, and current-password verification. Success atomically updates the versioned scrypt hash, increments the session epoch, revokes all old sessions, creates one replacement session, and returns the standard user/CSRF bootstrap response with fresh cookies. Responses never include password hashes or session tokens. Login failures use one generic status/message.
 
 ## Folders
 

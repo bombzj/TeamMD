@@ -40,18 +40,20 @@ pnpm dev
 
 Local endpoints are web `http://localhost:5173`, API `http://localhost:3000`, and collaboration WebSocket `ws://localhost:3001`.
 
+In VS Code, run **Tasks: Run Task** from the Command Palette and select **TeamMD: Start dev servers**. The compound task starts API/collaboration and web in separate grouped terminals and waits for both readiness messages. Open `http://localhost:5173`; using `127.0.0.1` does not match the configured trusted web origin. Stop both processes with **Tasks: Terminate Task** and select the same task.
+
 ## Commands
 
-| Command                          | Purpose                                |
-| -------------------------------- | -------------------------------------- |
-| `pnpm dev`                       | Run workspace development processes    |
-| `pnpm build`                     | Build all packages in dependency order |
-| `pnpm typecheck`                 | Typecheck all packages                 |
-| `pnpm lint`                      | Lint all packages                      |
-| `pnpm test`                      | Run package tests                      |
-| `pnpm format:check`              | Check formatting                       |
-| `pnpm --filter @teammd/api test` | Run API tests only                     |
-| `pnpm --filter @teammd/web test` | Run web tests only                     |
+| Command                          | Purpose                                 |
+| -------------------------------- | --------------------------------------- |
+| `pnpm dev`                       | Run API, collaboration, and web locally |
+| `pnpm build`                     | Build all packages in dependency order  |
+| `pnpm typecheck`                 | Typecheck all packages                  |
+| `pnpm lint`                      | Lint all packages                       |
+| `pnpm test`                      | Run package tests                       |
+| `pnpm format:check`              | Check formatting                        |
+| `pnpm --filter @teammd/api test` | Run API tests only                      |
+| `pnpm --filter @teammd/web test` | Run web tests only                      |
 
 Prefer the narrowest package command while iterating, followed by root checks for cross-cutting changes.
 

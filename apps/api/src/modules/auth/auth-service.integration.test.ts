@@ -11,8 +11,10 @@ const prisma = new PrismaClient({ log: ['error'] });
 const authService = new AuthService(prisma, 30);
 const testEmail = `auth-test-${crypto.randomUUID()}@example.test`;
 const password = 'correct horse battery staple';
+const replacementPassword = 'another secure password phrase';
 const context = { userAgentSummary: 'Vitest integration' };
 let userId: string;
+let registrationSessionToken: string;
 
 beforeAll(async () => {
   await prisma.$connect();
@@ -34,6 +36,7 @@ describe('AuthService with MySQL', () => {
       'integration-register',
     );
     userId = result.user.id;
+    registrationSessionToken = result.sessionToken;
 
     const storedUser = await prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -67,6 +70,48 @@ describe('AuthService with MySQL', () => {
     await expect(
       authService.authenticate(result.sessionToken),
     ).resolves.toBeNull();
+  });
+
+  it('changes the password, revokes old sessions, and returns a replacement session', async () => {
+    const oldSession = await authService.login(
+      testEmail,
+      password,
+      context,
+      'integration-password-login',
+    );
+    const replacement = await authService.changePassword(
+      userId,
+      password,
+      replacementPassword,
+      context,
+      'integration-password-change',
+    );
+
+    await expect(
+      authService.authenticate(registrationSessionToken),
+    ).resolves.toBeNull();
+    await expect(
+      authService.authenticate(oldSession.sessionToken),
+    ).resolves.toBeNull();
+    await expect(
+      authService.authenticate(replacement.sessionToken),
+    ).resolves.toMatchObject({ user: { id: userId } });
+    await expect(
+      authService.login(
+        testEmail,
+        password,
+        context,
+        'integration-old-password',
+      ),
+    ).rejects.toMatchObject({ statusCode: 401, code: 'INVALID_CREDENTIALS' });
+    await expect(
+      authService.login(
+        testEmail,
+        replacementPassword,
+        context,
+        'integration-new-password',
+      ),
+    ).resolves.toMatchObject({ user: { id: userId } });
   });
 });
 

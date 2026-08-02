@@ -23,6 +23,7 @@ Primary threats are credential stuffing, account/session theft, CSRF, stored XSS
 - Require a session-bound CSRF token and strict `Origin`/`Referer` validation for every mutation. CORS allows only configured origins with credentials.
 - Recheck expiry, revocation, disabled user state, and session epoch server-side.
 - Support current-session logout, individual session revocation, and logout-all. Password reset revokes all existing sessions.
+- Password change requires the current password, a session-bound CSRF token, and an allowed origin. On success, update the password hash, increment the session epoch, revoke every old session, create one replacement session, and record an `AUTH_PASSWORD_CHANGE` audit event in one transaction.
 - Never place session, public-link, invitation, verification, or reset tokens in logs, analytics, referrer-leaking pages, or persistent browser storage.
 
 ## Authorization

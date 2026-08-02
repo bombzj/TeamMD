@@ -1,0 +1,59 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "TeamMD: API + collaboration",
+      "type": "shell",
+      "command": "corepack pnpm --filter @teammd/api dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "teammd-api",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Server listening at http://127\\.0\\.0\\.1:3000"
+        }
+      },
+      "presentation": {
+        "group": "teammd-dev",
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "TeamMD: Web",
+      "type": "shell",
+      "command": "corepack pnpm --filter @teammd/web dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "teammd-web",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Local:\\s+http://localhost:5173/"
+        }
+      },
+      "presentation": {
+        "group": "teammd-dev",
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "TeamMD: Start dev servers",
+      "dependsOn": ["TeamMD: API + collaboration", "TeamMD: Web"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

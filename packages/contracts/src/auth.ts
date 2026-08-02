@@ -17,6 +17,17 @@ export const loginRequestSchema = z
   })
   .strict();
 
+export const changePasswordRequestSchema = z
+  .object({
+    currentPassword: passwordSchema,
+    newPassword: passwordSchema,
+  })
+  .strict()
+  .refine((value) => value.currentPassword !== value.newPassword, {
+    message: 'The new password must be different from the current password.',
+    path: ['newPassword'],
+  });
+
 export const userSchema = z
   .object({
     id: z.string().min(20).max(30),
@@ -57,6 +68,7 @@ export const sessionListResponseSchema = z
 
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
 export type UserDto = z.infer<typeof userSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type SessionDto = z.infer<typeof sessionSchema>;

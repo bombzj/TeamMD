@@ -271,6 +271,15 @@ select:focus-visible {
   font-size: 13px;
   line-height: 1.45;
 }
+.form-success {
+  margin-top: 8px;
+  border-left: 3px solid var(--teal);
+  padding: 10px 12px;
+  color: #245c57;
+  background: rgba(47, 113, 108, 0.08);
+  font-size: 13px;
+  line-height: 1.45;
+}
 .submit-button,
 .primary-action,
 .new-document {
@@ -318,20 +327,6 @@ select:focus-visible {
   overflow: hidden;
   background: var(--paper-light);
 }
-.topbar {
-  display: flex;
-  height: 62px;
-  border-bottom: 1px solid var(--line);
-  padding: 0 22px;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--paper);
-}
-.topbar-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
 .icon-button {
   display: grid;
   width: 38px;
@@ -341,23 +336,9 @@ select:focus-visible {
   background: transparent;
   place-items: center;
 }
-.mobile-logout {
-  display: none;
-}
-.user-chip {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  color: white;
-  background: var(--teal);
-  font-size: 13px;
-  font-weight: 600;
-  place-items: center;
-}
 .workspace-body {
   display: grid;
-  height: calc(100vh - 62px);
+  height: 100vh;
   min-height: 0;
   overflow: hidden;
   grid-template-columns: 238px minmax(0, 1fr);
@@ -370,6 +351,11 @@ select:focus-visible {
   background: var(--paper);
   flex-direction: column;
 }
+.sidebar-brand {
+  min-height: 42px;
+  padding: 4px 8px 18px;
+  font-size: 24px;
+}
 .new-document {
   min-height: 42px;
 }
@@ -378,8 +364,7 @@ select:focus-visible {
   gap: 4px;
   margin-top: 25px;
 }
-.nav-row,
-.logout-button {
+.nav-row {
   display: flex;
   min-height: 40px;
   border: 0;
@@ -400,8 +385,108 @@ select:focus-visible {
   cursor: not-allowed;
   opacity: 0.5;
 }
-.logout-button {
+.account-menu {
+  position: relative;
   margin-top: auto;
+}
+.account-trigger {
+  display: grid;
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-radius: 4px;
+  padding: 7px 8px;
+  color: var(--ink);
+  background: transparent;
+  grid-template-columns: 34px minmax(0, 1fr) 18px;
+  gap: 9px;
+  align-items: center;
+  text-align: left;
+}
+.account-trigger:hover,
+.account-trigger[aria-expanded='true'] {
+  background: #e5e0d5;
+}
+.account-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: white;
+  background: var(--teal);
+  font-size: 13px;
+  font-weight: 600;
+  place-items: center;
+}
+.account-trigger-copy,
+.account-summary > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.account-trigger-copy strong,
+.account-summary strong,
+.account-trigger-copy small,
+.account-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-trigger-copy strong,
+.account-summary strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.account-trigger-copy small,
+.account-summary small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.account-chevron {
+  color: var(--muted);
+}
+.account-popover {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--paper-light);
+  box-shadow: 0 14px 34px rgba(35, 34, 31, 0.16);
+}
+.account-summary {
+  display: grid;
+  padding: 8px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+.account-menu-separator {
+  height: 1px;
+  margin: 5px 2px;
+  background: var(--line);
+}
+.account-popover > button {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0 10px;
+  gap: 9px;
+  align-items: center;
+  color: var(--ink);
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+}
+.account-popover > button:hover,
+.account-popover > button:focus-visible {
+  background: #e5e0d5;
 }
 .workspace-main {
   min-width: 0;
@@ -716,6 +801,10 @@ select:focus-visible {
   margin: 7px 0 24px;
   font-family: 'Newsreader', serif;
   font-size: 31px;
+}
+.settings-dialog {
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 .dialog-close {
   position: absolute;
@@ -1930,9 +2019,10 @@ body.editor-full-screen-open {
   }
   .workspace-body {
     height: auto;
-    min-height: calc(100vh - 62px);
+    min-height: 100vh;
     overflow: visible;
     grid-template-columns: minmax(0, 1fr);
+    align-content: start;
   }
   .workspace-shell {
     height: auto;
@@ -1947,8 +2037,11 @@ body.editor-full-screen-open {
     border-right: 0;
     border-bottom: 1px solid var(--line);
     padding: 10px 14px;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 10px;
+  }
+  .sidebar-brand {
+    display: none;
   }
   .sidebar .new-document {
     width: 44px;
@@ -1960,18 +2053,37 @@ body.editor-full-screen-open {
     min-width: 0;
     margin: 0;
     gap: 2px;
+    align-items: center;
+    justify-content: center;
   }
   .nav-row {
-    min-width: 0;
-    padding: 0 8px;
-    gap: 6px;
-    font-size: 12px;
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    justify-content: center;
   }
-  .logout-button {
+  .nav-label {
     display: none;
   }
-  .mobile-logout {
-    display: grid;
+  .account-menu {
+    margin-top: 0;
+  }
+  .account-trigger {
+    width: 40px;
+    min-height: 40px;
+    padding: 3px;
+    grid-template-columns: 34px;
+  }
+  .account-trigger-copy,
+  .account-chevron {
+    display: none;
+  }
+  .account-popover {
+    right: 0;
+    bottom: auto;
+    left: auto;
+    top: calc(100% + 8px);
+    width: min(270px, calc(100vw - 28px));
   }
   .workspace-main {
     overflow: visible;

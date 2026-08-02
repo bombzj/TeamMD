@@ -431,11 +431,9 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             <ArrowLeft size={19} />
           </button>
           <div>
-            <p className="eyebrow">
-              {readOnly
-                ? 'Shared document · View only'
-                : 'Shared Markdown document'}
-            </p>
+            {readOnly ? (
+              <p className="eyebrow">Shared document · View only</p>
+            ) : null}
             <h1>{documentQuery.data.name}</h1>
           </div>
         </div>
