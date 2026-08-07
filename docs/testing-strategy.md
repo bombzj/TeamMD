@@ -40,6 +40,7 @@ Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not 
 - awareness changes update participant count and trusted ephemeral cursor/selection identity;
 - rendered Markdown is directly editable without a second live preview, while Vditor remains read-only for static history/public content;
 - read-only mode, IME composition, visible Undo/Redo through the active Yjs or ProseMirror history, clipboard Markdown, tables, code blocks, links, and narrow viewports remain stable;
+- blackboard pressure-aware logical-coordinate drawing, basic shape gestures, line-segment and lasso group selection, one-transaction group movement/deletion, keyboard deletion, zoom invariance, non-mutating drag-pan, collection reorder, and client-local Yjs Undo/Redo that excludes another collaborator's origin;
 - rich editor controls expose names and tooltips, pointer-driven block/link actions and code-language search receive semantic keyboard activation and visible focus, language entries use listbox option semantics, and mutation controls stay hidden from viewers;
 - exact Mermaid-fence detection, source and line limits, strict SVG sanitization, same-document SVG reference integrity, post-style fitted geometry, Gantt duplicate-label normalization, bounded errors, serialized rapid updates, render timeout, teardown cancellation, source/preview toggling, and source-preserving Markdown serialization;
 - static history/public interception of Vditor's bundled Mermaid path, read-only derived rendering from preserved code text, local invalid-diagram errors, stale revision isolation, and cleanup of pending renders;
@@ -51,6 +52,7 @@ Use Vitest, Testing Library, and a DOM environment. Mock the HTTP boundary, not 
 - shared-draft dirty state, `Ctrl+S`/`Cmd+S`, checkpoint success/failure, transport status, and viewer controls;
 - background queries do not replace Yjs state and checkpoint notices do not mark later concurrent edits as saved;
 - restore control events force an authorized refetch and a fresh Yjs document while ending at a clean saved revision;
+- blackboard creation captures the authoritative Markdown once, multiple board/stroke maps converge, background replacement is rejected, and board-only changes participate in dirty/checkpoint state;
 - public fragment routing skips session bootstrap, strips the bearer from the address bar, performs one resolver request under React Strict Mode, and renders no writable controls;
 - navigation and tab-close warnings when dirty;
 - permission-based presentation while assuming the API remains authoritative;
@@ -71,6 +73,7 @@ Use Playwright against built web/API applications and isolated MySQL data. Criti
 9. Create a public link, open it in an isolated anonymous context, verify only the current saved revision, rotate/revoke it, and verify the old token becomes generically unavailable.
 10. Add and concurrently edit a Mermaid fence, verify both clients converge on identical source, checkpoint it, and confirm editor, history, and public previews derive sanitized diagrams without persisting SVG.
 11. Add inline and display formulas, edit from two clients, checkpoint, inspect history/public rendering, and confirm only portable formula source is persisted.
+12. Create two blackboards from different Markdown states, draw concurrently, checkpoint, inspect frozen backgrounds in history, restore the collection, and confirm the public view exposes neither board.
 
 Run Chromium on every pull request and add Firefox/WebKit in scheduled or release workflows. Include desktop and narrow mobile viewport checks even though native mobile is out of scope.
 

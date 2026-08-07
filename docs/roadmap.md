@@ -85,6 +85,24 @@ Real-time work must not weaken explicit snapshots, auditability, revocation, or 
 
 **Exit:** users edit rendered Markdown directly with no separate preview, two clients converge through the structured Yjs document, server checkpoints remain canonical Markdown, existing drafts and immutable revisions are preserved, and incompatible clients cannot create divergent live roots.
 
+## Phase 8: Document Blackboard Mode
+
+In progress. The negotiated state format, immutable revision storage, frozen-background validation, multi-board drawing UI, reorder, individual and lasso group selection/move, pressure-aware ink, line/rectangle/ellipse/arrow gestures, client-local Yjs Undo/Redo, per-board zoom and drag-panning, checkpoint/restore path, and focused contract/API/web tests are implemented. Broader real-device mouse/touch/stylus and visual coverage, performance budgets, and rollout gates remain.
+
+- Finalize the classroom-oriented interaction model with multiple named blackboards, each using a fixed, viewport-independent logical sheet over its own read-only Markdown copy captured at creation.
+- Add a versioned, bounded blackboard collection and independent vector-stroke layers to the authenticated document Yjs room without creating another Markdown document or changing canonical Markdown.
+- Add create, rename, reorder, delete, and switch controls plus pen, highlighter, eraser, selection/move, pan/zoom, and local collaborative Undo/Redo with keyboard, pointer, touch, and stylus support.
+- Make one explicit Save atomically checkpoint canonical main Markdown and the complete corresponding blackboard collection, including copied backgrounds, into the same immutable document revision.
+- Restore both Markdown and the exact blackboard collection through the existing new-revision and room-generation boundary; treat older revisions as having no blackboards.
+- Keep each copied background unchanged when the main Markdown changes; creating another board captures a new copy, while background refresh and stroke migration remain out of scope.
+- List and render saved blackboards read-only in authorized history views. Keep public-link blackboard rendering disabled until its separate privacy and abuse review is complete.
+- Enforce blackboard-count, name, canvas, stroke, point, coordinate, update, and aggregate saved-byte limits at browser, collaboration, and checkpoint boundaries.
+- Add two-browser convergence, save atomicity, restore, reconnect, revocation, read-only, accessibility, pen/touch, performance, and responsive-layout tests.
+
+Blackboard state is a supplementary versioned collection of independent vector layers and read-only Markdown background copies associated with the main document. A copied background never changes after board creation, so its strokes cannot be displaced by later main-document edits. Layers must never be flattened into Markdown or raster images, and main Markdown export remains portable plain text.
+
+**Exit:** two authorized editors can create and draw on different blackboards over one Markdown document, converge, and create or restore an immutable revision whose Markdown and complete blackboard collection are from the same authoritative room state, while viewers remain read-only and public links do not expose drawings.
+
 ## Deferred: Durable Offline-First Editing
 
 Online reconnect and durable server-side Yjs state are complete. True offline-first editing remains a separate milestone requiring IndexedDB-backed Yjs persistence, bounded offline queues/storage, collaboration-generation handling after restore, revocation semantics while disconnected, and deterministic multi-device reconciliation tests. It must not ship as a partial cache feature that weakens explicit-save or no-data-loss guarantees.

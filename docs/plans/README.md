@@ -4,6 +4,7 @@ This folder contains scoped delivery plans for substantial product or architectu
 
 ## Active Plans
 
+- [Document Blackboard Mode Plan](blackboard-mode.md) - Multiple collaborative vector blackboards over each Markdown document with atomic revision checkpoints.
 - [Rich Editor And Mermaid Feature Plan](feature-plan.md) - Rich Milkdown authoring, explicit feature compatibility, and secure Mermaid rendering.
 - [Milkdown Collaboration Migration Plan](milkdown-migration.md) - Migration from legacy collaborative text rooms to one structured Milkdown/Yjs writable surface.
 

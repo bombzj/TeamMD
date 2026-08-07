@@ -5,12 +5,15 @@ import {
   collaborationRestoreEventSchema,
   type CollaborationCheckpointEvent,
   type CollaborationTicketResponse,
+  type BlackboardSnapshot,
+  type BlackboardStroke,
 } from '@teammd/contracts';
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider';
 import * as Y from 'yjs';
 
 import { createTeamMdEditor } from './editor-feature-profile.js';
 import { runHistoryShortcut } from './editor-history.js';
+import { createBlackboardStore } from './blackboard-state.js';
 
 export type CollaborationTransport =
   `${WebSocketStatus}` | 'synced' | 'offline';
@@ -22,6 +25,7 @@ type CollaborativeEditorOptions = {
   onCheckpoint: (checkpoint: CollaborationCheckpointEvent) => void;
   onRestore: () => void;
   onContentChange: (content: string) => void;
+  onBlackboardsChange: (blackboards: BlackboardSnapshot[]) => void;
   onError: (message: string) => void;
   onPermissionChange: (
     permission: CollaborationTicketResponse['permission'],
@@ -36,13 +40,42 @@ export type CollaborativeEditor = {
   prepareCheckpoint: () => Promise<void>;
   redo: () => boolean;
   undo: () => boolean;
+  addBlackboardStroke?: (
+    blackboardId: string,
+    stroke: BlackboardStroke,
+  ) => void;
+  clearBlackboard?: (blackboardId: string) => void;
+  createBlackboard?: (
+    name: string,
+    backgroundMarkdown: string,
+  ) => Promise<string>;
+  deleteBlackboard?: (blackboardId: string) => void;
+  deleteBlackboardStroke?: (blackboardId: string, strokeId: string) => void;
+  deleteBlackboardStrokes?: (blackboardId: string, strokeIds: string[]) => void;
+  getBlackboards?: () => BlackboardSnapshot[];
+  moveBlackboardStroke?: (
+    blackboardId: string,
+    strokeId: string,
+    deltaX: number,
+    deltaY: number,
+  ) => void;
+  moveBlackboardStrokes?: (
+    blackboardId: string,
+    strokeIds: string[],
+    deltaX: number,
+    deltaY: number,
+  ) => void;
+  redoBlackboard?: () => boolean;
+  renameBlackboard?: (blackboardId: string, name: string) => void;
+  reorderBlackboard?: (blackboardId: string, targetIndex: number) => void;
+  undoBlackboard?: () => boolean;
 };
 
 export async function createCollaborativeEditor(
   options: CollaborativeEditorOptions,
 ): Promise<CollaborativeEditor> {
   const initialTicket = await options.createTicket();
-  if (initialTicket.stateFormat !== 'milkdown-xml-v1') {
+  if (initialTicket.stateFormat !== 'milkdown-blackboards-v1') {
     throw new Error('The collaboration room requires an unsupported editor.');
   }
   let readOnly = initialTicket.permission === 'viewer';
@@ -53,6 +86,11 @@ export async function createCollaborativeEditor(
   let destroyed = false;
   const yDocument = new Y.Doc();
   const xmlFragment = yDocument.getXmlFragment('milkdown');
+  const blackboards = createBlackboardStore(
+    yDocument,
+    () => !readOnly && provider.synced,
+  );
+  let unsubscribeBlackboards: () => void = () => {};
   const publishContent = (content: string) => {
     if (content === currentContent) return;
     currentContent = content;
@@ -79,7 +117,7 @@ export async function createCollaborativeEditor(
     token: async () => {
       const ticket = nextTicket ?? (await options.createTicket());
       nextTicket = null;
-      if (ticket.stateFormat !== 'milkdown-xml-v1') {
+      if (ticket.stateFormat !== 'milkdown-blackboards-v1') {
         throw new Error('The collaboration room changed editor format.');
       }
       readOnly = ticket.permission === 'viewer';
@@ -128,6 +166,7 @@ export async function createCollaborativeEditor(
 
   try {
     await initialSync.promise;
+    unsubscribeBlackboards = blackboards.subscribe(options.onBlackboardsChange);
     window.clearTimeout(syncTimeout);
     if (destroyed) throw new Error('The editor was closed before it loaded.');
 
@@ -158,6 +197,8 @@ export async function createCollaborativeEditor(
   } catch (error) {
     window.clearTimeout(syncTimeout);
     provider.destroy();
+    unsubscribeBlackboards();
+    blackboards.destroy();
     yDocument.destroy();
     throw error;
   }
@@ -166,6 +207,19 @@ export async function createCollaborativeEditor(
     getContent: () => currentContent ?? crepe?.getMarkdown() ?? '',
     undo: () => runHistoryShortcut(options.editorHost, 'undo'),
     redo: () => runHistoryShortcut(options.editorHost, 'redo'),
+    getBlackboards: blackboards.list,
+    createBlackboard: blackboards.create,
+    renameBlackboard: blackboards.rename,
+    deleteBlackboard: blackboards.delete,
+    reorderBlackboard: blackboards.reorder,
+    clearBlackboard: blackboards.clear,
+    addBlackboardStroke: blackboards.addStroke,
+    deleteBlackboardStroke: blackboards.deleteStroke,
+    deleteBlackboardStrokes: blackboards.deleteStrokes,
+    moveBlackboardStroke: blackboards.moveStroke,
+    moveBlackboardStrokes: blackboards.moveStrokes,
+    undoBlackboard: blackboards.undo,
+    redoBlackboard: blackboards.redo,
     prepareCheckpoint: async () => {
       if (readOnly) {
         throw new Error('You no longer have permission to save this document.');
@@ -199,6 +253,8 @@ export async function createCollaborativeEditor(
       window.clearTimeout(syncTimeout);
       window.clearTimeout(contentTimer);
       xmlFragment.unobserveDeep(handleXmlChange);
+      unsubscribeBlackboards();
+      blackboards.destroy();
       if (crepe !== null) await crepe.destroy();
       crepe = null;
       provider.destroy();

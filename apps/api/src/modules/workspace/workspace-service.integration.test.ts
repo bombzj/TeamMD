@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { ApiError } from '../../lib/api-error.js';
@@ -246,6 +247,73 @@ describe('WorkspaceService with MySQL', () => {
       restoredFromRevisionId: created.currentRevision.id,
       saveMessage: 'Recover the original draft',
     });
+  });
+
+  it('checkpoints and restores frozen blackboard Markdown with its revision', async () => {
+    const created = await workspaceService.createDocument(
+      userId,
+      { name: 'Classroom.md', folderId: null },
+      'workspace-blackboard-create',
+    );
+    await prisma.collaborationState.create({
+      data: {
+        documentId: created.id,
+        checkpointRevisionId: created.currentRevision.id,
+        stateFormat: 'MILKDOWN_BLACKBOARDS_V1',
+        yjsState: Buffer.from([]),
+      },
+    });
+    const backgroundMarkdown = '# Lesson one\n';
+    const blackboard = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Examples',
+      order: 0,
+      backgroundMarkdown,
+      backgroundHash: createHash('sha256')
+        .update(backgroundMarkdown)
+        .digest('hex'),
+      strokes: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          tool: 'pen' as const,
+          color: '#112233',
+          width: 4,
+          points: [{ x: 10, y: 20, pressure: 0.5 }],
+        },
+      ],
+    };
+    const saved = await workspaceService.saveDocument(
+      userId,
+      created.id,
+      {
+        baseRevisionId: created.currentRevision.id,
+        content: backgroundMarkdown,
+      },
+      'workspace-blackboard-save',
+      true,
+      [blackboard],
+    );
+
+    const historical = await workspaceService.getRevision(
+      userId,
+      created.id,
+      saved.currentRevision.id,
+    );
+    expect(historical.blackboards).toEqual([blackboard]);
+
+    const restored = await workspaceService.restoreRevision(
+      userId,
+      created.id,
+      saved.currentRevision.id,
+      { baseRevisionId: saved.currentRevision.id },
+      'workspace-blackboard-restore',
+    );
+    const restoredRevision = await workspaceService.getRevision(
+      userId,
+      created.id,
+      restored.currentRevision.id,
+    );
+    expect(restoredRevision.blackboards).toEqual([blackboard]);
   });
 
   it('allows editors to save, viewers to read, and hides owner hierarchy', async () => {

@@ -7,6 +7,10 @@ const publicLinkTokenSchema = z
   .regex(/^[A-Za-z0-9_-]+$/);
 const optionalParentIdSchema = resourceIdSchema.nullable();
 const maximumMarkdownBytes = 2 * 1024 * 1024;
+export const maximumBlackboardsPerDocument = 12;
+export const maximumBlackboardStrokes = 500;
+export const maximumBlackboardPointsPerStroke = 2_048;
+const maximumBlackboardNameLength = 80;
 const workspaceNameSchema = z
   .string()
   .trim()
@@ -112,8 +116,73 @@ export const revisionListResponseSchema = z
   .object({ revisions: z.array(revisionHistoryItemSchema).max(200) })
   .strict();
 
+export const blackboardPointSchema = z
+  .object({
+    x: z.number().finite().min(0).max(100_000),
+    y: z.number().finite().min(0).max(100_000),
+    pressure: z.number().finite().min(0).max(1),
+  })
+  .strict();
+
+export const blackboardStrokeSchema = z
+  .object({
+    id: z.uuid(),
+    tool: z.enum(['pen', 'highlighter']),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    width: z.number().finite().min(1).max(32),
+    points: z
+      .array(blackboardPointSchema)
+      .min(1)
+      .max(maximumBlackboardPointsPerStroke),
+  })
+  .strict();
+
+export const blackboardSnapshotSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().trim().min(1).max(maximumBlackboardNameLength),
+    order: z.number().int().nonnegative(),
+    backgroundMarkdown: z
+      .string()
+      .refine(
+        (value) =>
+          new TextEncoder().encode(value).byteLength <= maximumMarkdownBytes,
+        { message: 'Blackboard background must not exceed 2 MiB.' },
+      ),
+    backgroundHash: z.string().regex(/^[a-f0-9]{64}$/),
+    strokes: z.array(blackboardStrokeSchema).max(maximumBlackboardStrokes),
+  })
+  .strict();
+
+export const blackboardCollectionSchema = z
+  .array(blackboardSnapshotSchema)
+  .max(maximumBlackboardsPerDocument)
+  .superRefine((blackboards, context) => {
+    const ids = new Set<string>();
+    const names = new Set<string>();
+    for (const [index, blackboard] of blackboards.entries()) {
+      const normalizedName = blackboard.name.trim().toLocaleLowerCase('en-US');
+      if (ids.has(blackboard.id)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Blackboard IDs must be unique.',
+          path: [index, 'id'],
+        });
+      }
+      if (names.has(normalizedName)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Blackboard names must be unique.',
+          path: [index, 'name'],
+        });
+      }
+      ids.add(blackboard.id);
+      names.add(normalizedName);
+    }
+  });
+
 export const revisionContentResponseSchema = revisionHistoryItemSchema
-  .extend({ content: z.string() })
+  .extend({ content: z.string(), blackboards: blackboardCollectionSchema })
   .strict();
 
 export const restoreRevisionRequestSchema = z
@@ -151,11 +220,13 @@ export const saveDocumentResponseSchema = z
 export const collaborationEditorProtocolSchema = z.enum([
   'legacy-text-v1',
   'milkdown-xml-v1',
+  'milkdown-blackboards-v1',
 ]);
 
 export const collaborationStateFormatSchema = z.enum([
   'legacy-text-v1',
   'milkdown-xml-v1',
+  'milkdown-blackboards-v1',
 ]);
 
 export const collaborationTicketRequestSchema = z
@@ -176,6 +247,7 @@ export const collaborationTicketResponseSchema = z
 export const collaborationCheckpointResponseSchema = saveDocumentResponseSchema
   .extend({
     contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+    blackboardHash: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 
@@ -183,6 +255,7 @@ export const collaborationCheckpointEventSchema = revisionSummarySchema
   .extend({
     type: z.literal('checkpoint'),
     contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+    blackboardHash: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 
@@ -190,6 +263,7 @@ export const collaborationRestoreEventSchema = revisionSummarySchema
   .extend({
     type: z.literal('document-restored'),
     contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+    blackboardHash: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 
@@ -291,6 +365,9 @@ export type RevisionListResponse = z.infer<typeof revisionListResponseSchema>;
 export type RevisionContentResponse = z.infer<
   typeof revisionContentResponseSchema
 >;
+export type BlackboardSnapshot = z.infer<typeof blackboardSnapshotSchema>;
+export type BlackboardStroke = z.infer<typeof blackboardStrokeSchema>;
+export type BlackboardPoint = z.infer<typeof blackboardPointSchema>;
 export type RestoreRevisionRequest = z.infer<
   typeof restoreRevisionRequestSchema
 >;

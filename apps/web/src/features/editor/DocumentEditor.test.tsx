@@ -4,25 +4,40 @@ import userEvent from '@testing-library/user-event';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+type MockBlackboard = {
+  id: string;
+  name: string;
+  order: number;
+  backgroundMarkdown: string;
+  backgroundHash: string;
+  strokes: [];
+};
+
 const collaboration = vi.hoisted(() => ({
+  blackboards: [] as MockBlackboard[],
   content: '',
   creationCount: 0,
   creationError: null as Error | null,
   initialContent: null as string | null,
   options: null as null | {
     onContentChange: (content: string) => void;
+    onBlackboardsChange: (blackboards: MockBlackboard[]) => void;
     onRestore: () => void;
     onPermissionChange: (permission: 'owner' | 'editor' | 'viewer') => void;
     onPresenceChange: (participantCount: number) => void;
     onTransportChange: (transport: 'synced') => void;
   },
   prepareCheckpoint: vi.fn().mockResolvedValue(undefined),
+  redoBlackboard: vi.fn().mockReturnValue(true),
+  reorderBlackboard: vi.fn(),
   redo: vi.fn().mockReturnValue(true),
+  undoBlackboard: vi.fn().mockReturnValue(true),
   undo: vi.fn().mockReturnValue(true),
 }));
 
 type MockEditorOptions = {
   onContentChange: (content: string) => void;
+  onBlackboardsChange: (blackboards: MockBlackboard[]) => void;
   onRestore: () => void;
   onPermissionChange: (permission: 'owner' | 'editor' | 'viewer') => void;
   onPresenceChange: (participantCount: number) => void;
@@ -41,10 +56,39 @@ vi.mock('./collaborative-editor.js', () => ({
     }
     collaboration.options = options;
     options.onTransportChange('synced');
+    options.onBlackboardsChange(collaboration.blackboards);
     options.onContentChange(collaboration.content);
     return Promise.resolve({
       destroy: vi.fn(),
       getContent: () => collaboration.content,
+      getBlackboards: () => collaboration.blackboards,
+      createBlackboard: (name: string, backgroundMarkdown: string) => {
+        const id = crypto.randomUUID();
+        collaboration.blackboards = [
+          ...collaboration.blackboards,
+          {
+            id,
+            name,
+            order: collaboration.blackboards.length,
+            backgroundMarkdown,
+            backgroundHash: sha256(backgroundMarkdown),
+            strokes: [],
+          },
+        ];
+        options.onBlackboardsChange(collaboration.blackboards);
+        return Promise.resolve(id);
+      },
+      renameBlackboard: vi.fn(),
+      deleteBlackboard: vi.fn(),
+      clearBlackboard: vi.fn(),
+      addBlackboardStroke: vi.fn(),
+      deleteBlackboardStroke: vi.fn(),
+      deleteBlackboardStrokes: vi.fn(),
+      moveBlackboardStroke: vi.fn(),
+      moveBlackboardStrokes: vi.fn(),
+      reorderBlackboard: collaboration.reorderBlackboard,
+      undoBlackboard: collaboration.undoBlackboard,
+      redoBlackboard: collaboration.redoBlackboard,
       prepareCheckpoint: collaboration.prepareCheckpoint,
       redo: collaboration.redo,
       undo: collaboration.undo,
@@ -58,6 +102,7 @@ vi.mock('./standalone-editor.js', () => ({
       collaboration.content = documentResponse.content;
       collaboration.options = {
         onContentChange: options.onContentChange,
+        onBlackboardsChange: vi.fn(),
         onRestore: vi.fn(),
         onPermissionChange: vi.fn(),
         onPresenceChange: vi.fn(),
@@ -101,12 +146,16 @@ beforeCrypto();
 afterEach(() => {
   cleanup();
   collaboration.content = '';
+  collaboration.blackboards = [];
   collaboration.creationCount = 0;
   collaboration.creationError = null;
   collaboration.initialContent = null;
   collaboration.options = null;
   collaboration.prepareCheckpoint.mockClear();
+  collaboration.redoBlackboard.mockClear();
+  collaboration.reorderBlackboard.mockClear();
   collaboration.redo.mockClear();
+  collaboration.undoBlackboard.mockClear();
   collaboration.undo.mockClear();
   vi.unstubAllGlobals();
   beforeCrypto();
@@ -204,6 +253,7 @@ describe('DocumentEditor', () => {
           jsonResponse({
             documentId,
             contentHash: sha256('# Canonical server serialization\n'),
+            blackboardHash: sha256('[]'),
             currentRevision: nextRevisionSummary,
           }),
         );
@@ -535,6 +585,7 @@ describe('DocumentEditor', () => {
           jsonResponse({
             documentId,
             contentHash: sha256(updatedContent),
+            blackboardHash: sha256('[]'),
             currentRevision: {
               id: 'cm1234567890revisionnextab',
               ordinal: 2,
@@ -614,6 +665,7 @@ describe('DocumentEditor', () => {
               createdAt: '2026-07-28T00:10:00.000Z',
             },
             contentHash: 'a'.repeat(64),
+            blackboardHash: sha256('[]'),
           }),
         );
       }
@@ -622,6 +674,7 @@ describe('DocumentEditor', () => {
           jsonResponse({
             ...historyRevision,
             content: '# Earlier\n',
+            blackboards: [],
           }),
         );
       }
@@ -763,6 +816,60 @@ describe('DocumentEditor', () => {
     );
     expect(await screen.findByText('Public link is off.')).toBeTruthy();
   });
+
+  it('creates separate blackboards from frozen copies of the current Markdown', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url === `/api/v1/documents/${documentId}`) {
+        return Promise.resolve(jsonResponse(documentResponse));
+      }
+      if (url.endsWith('/collaboration-ticket')) {
+        return Promise.resolve(jsonResponse(collaborationTicket()));
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderEditor();
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: 'Readme.md' });
+    await user.click(screen.getByRole('button', { name: 'Show blackboards' }));
+    await user.click(screen.getByRole('button', { name: 'Create blackboard' }));
+    expect(
+      await screen.findByRole('tab', { name: 'Blackboard 1' }),
+    ).toBeTruthy();
+    expect(collaboration.blackboards[0]?.backgroundMarkdown).toBe(
+      '# Initial\n',
+    );
+
+    act(() => {
+      collaboration.content = '# Later lesson\n';
+      collaboration.options?.onContentChange(collaboration.content);
+    });
+    await user.click(screen.getByRole('button', { name: 'New blackboard' }));
+    expect(
+      await screen.findByRole('tab', { name: 'Blackboard 2' }),
+    ).toBeTruthy();
+    expect(collaboration.blackboards[0]?.backgroundMarkdown).toBe(
+      '# Initial\n',
+    );
+    expect(collaboration.blackboards[1]?.backgroundMarkdown).toBe(
+      '# Later lesson\n',
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Blackboard 1' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Move blackboard right' }),
+    );
+    expect(collaboration.reorderBlackboard).toHaveBeenCalledWith(
+      collaboration.blackboards[0]?.id,
+      1,
+    );
+    await user.click(screen.getByRole('button', { name: 'Undo blackboard' }));
+    await user.click(screen.getByRole('button', { name: 'Redo blackboard' }));
+    expect(collaboration.undoBlackboard).toHaveBeenCalledTimes(1);
+    expect(collaboration.redoBlackboard).toHaveBeenCalledTimes(1);
+  });
 });
 
 function renderEditor() {
@@ -781,14 +888,19 @@ function collaborationTicket() {
     ticket: 'a'.repeat(43),
     documentId,
     permission: 'owner',
-    stateFormat: 'legacy-text-v1',
+    stateFormat: 'milkdown-blackboards-v1',
     websocketUrl: 'ws://localhost:3001/',
     expiresAt: '2026-07-28T00:01:00.000Z',
   };
 }
 
 function beforeCrypto() {
+  let uuidSequence = 0;
   vi.stubGlobal('crypto', {
+    randomUUID: vi.fn(() => {
+      uuidSequence += 1;
+      return `11111111-1111-4111-8111-${uuidSequence.toString().padStart(12, '0')}`;
+    }),
     subtle: {
       digest: vi.fn((_algorithm: string, data: ArrayBuffer) => {
         const hash = createHash('sha256').update(new Uint8Array(data)).digest();
@@ -797,6 +909,29 @@ function beforeCrypto() {
         );
       }),
     },
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      public observe() {}
+      public disconnect() {}
+    },
+  );
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: vi.fn(
+      () =>
+        ({
+          beginPath: vi.fn(),
+          clearRect: vi.fn(),
+          lineTo: vi.fn(),
+          moveTo: vi.fn(),
+          restore: vi.fn(),
+          save: vi.fn(),
+          setTransform: vi.fn(),
+          stroke: vi.fn(),
+        }) as unknown as CanvasRenderingContext2D,
+    ),
   });
 }
 

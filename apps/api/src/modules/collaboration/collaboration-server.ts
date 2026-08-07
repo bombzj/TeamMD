@@ -7,6 +7,7 @@ import type {
   CollaborationService,
 } from './collaboration-service.js';
 import { getMilkdownCodec } from './milkdown-codec.js';
+import { validateBlackboardTransition } from './blackboard-state.js';
 
 const maximumMarkdownBytes = 2 * 1024 * 1024;
 const maximumSocketPayloadBytes = 3 * 1024 * 1024;
@@ -75,13 +76,16 @@ export function createCollaborationServer(
         Y.applyUpdate(candidate, Y.encodeStateAsUpdate(document));
         Y.applyUpdate(candidate, payload);
         const markdown =
-          context.stateFormat === 'milkdown-xml-v1'
+          context.stateFormat !== 'legacy-text-v1'
             ? (await getMilkdownCodec()).read(candidate)
             : candidate.getText('content').toJSON();
         if (
           new TextEncoder().encode(markdown).byteLength > maximumMarkdownBytes
         ) {
           throw new Error('Markdown content is too large.');
+        }
+        if (context.stateFormat === 'milkdown-blackboards-v1') {
+          validateBlackboardTransition(document, candidate, markdown);
         }
       } finally {
         candidate.destroy();

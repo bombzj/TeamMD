@@ -15,6 +15,11 @@ import type {
   CollaborationService,
 } from './collaboration-service.js';
 import { getMilkdownCodec } from './milkdown-codec.js';
+import {
+  blackboardCollectionHash,
+  readBlackboards,
+  writeBlackboards,
+} from './blackboard-state.js';
 
 export class CollaborationCheckpointService {
   public constructor(
@@ -51,6 +56,11 @@ export class CollaborationCheckpointService {
       return await room.saveMutex.runExclusive(async () => {
         const content = await readMarkdown(room, stateFormat);
         const contentHash = createHash('sha256').update(content).digest('hex');
+        const blackboards =
+          stateFormat === 'milkdown-blackboards-v1'
+            ? readBlackboards(room)
+            : [];
+        const blackboardHash = blackboardCollectionHash(blackboards);
         await this.collaborationService.storeState(
           documentId,
           Y.encodeStateAsUpdate(room),
@@ -70,15 +80,17 @@ export class CollaborationCheckpointService {
           },
           requestId,
           true,
+          blackboards,
         );
         room.broadcastStateless(
           JSON.stringify({
             type: 'checkpoint',
             ...result.currentRevision,
             contentHash,
+            blackboardHash,
           }),
         );
-        return { ...result, contentHash };
+        return { ...result, contentHash, blackboardHash };
       });
     } finally {
       await directConnection.disconnect({ unloadImmediately: false });
@@ -91,8 +103,8 @@ export class CollaborationCheckpointService {
   ): Promise<void> {
     await this.workspaceService.getDocument(userId, documentId);
     if (
-      (await this.collaborationService.getStateFormat(documentId)) ===
-      'milkdown-xml-v1'
+      (await this.collaborationService.getStateFormat(documentId)) !==
+      'legacy-text-v1'
     ) {
       return;
     }
@@ -148,6 +160,53 @@ export class CollaborationCheckpointService {
     }
   }
 
+  public async migrateToBlackboards(
+    userId: string,
+    documentId: string,
+  ): Promise<void> {
+    await this.migrateToMilkdown(userId, documentId);
+    if (
+      (await this.collaborationService.getStateFormat(documentId)) ===
+      'milkdown-blackboards-v1'
+    ) {
+      return;
+    }
+    const directConnection = await this.collaboration.openDirectConnection(
+      documentId,
+      {
+        userId,
+        userEmail: 'System blackboard migration',
+        sessionId: 'http-blackboard-migration',
+        documentId,
+        permission: 'viewer',
+        readOnly: true,
+        stateFormat: 'milkdown-xml-v1',
+      },
+    );
+    const room = directConnection.document;
+    if (room === null)
+      throw new Error('The collaboration room is unavailable.');
+
+    let converted = false;
+    try {
+      converted = await room.saveMutex.runExclusive(async () => {
+        if (
+          (await this.collaborationService.getStateFormat(documentId)) !==
+          'milkdown-xml-v1'
+        ) {
+          return false;
+        }
+        return this.collaborationService.convertMilkdownState(
+          documentId,
+          Y.encodeStateAsUpdate(room),
+        );
+      });
+      if (converted) this.collaboration.closeConnections(documentId);
+    } finally {
+      await directConnection.disconnect({ unloadImmediately: true });
+    }
+  }
+
   public async restoreRevision(
     userId: string,
     documentId: string,
@@ -188,6 +247,9 @@ export class CollaborationCheckpointService {
           requestId,
         );
         await writeMarkdown(room, stateFormat, source.content);
+        if (stateFormat === 'milkdown-blackboards-v1') {
+          writeBlackboards(room, source.blackboards);
+        }
         await this.collaborationService.storeState(
           documentId,
           Y.encodeStateAsUpdate(room),
@@ -196,15 +258,17 @@ export class CollaborationCheckpointService {
         const contentHash = createHash('sha256')
           .update(source.content)
           .digest('hex');
+        const blackboardHash = blackboardCollectionHash(source.blackboards);
         room.broadcastStateless(
           JSON.stringify({
             type: 'document-restored',
             ...result.currentRevision,
             contentHash,
+            blackboardHash,
           }),
         );
         this.collaboration.closeConnections(documentId);
-        return { ...result, contentHash };
+        return { ...result, contentHash, blackboardHash };
       });
     } finally {
       await directConnection.disconnect({ unloadImmediately: false });

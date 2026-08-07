@@ -1,6 +1,8 @@
 import {
   collaborationCheckpointEventSchema,
   type CollaborationCheckpointEvent,
+  type BlackboardSnapshot,
+  type BlackboardStroke,
   type CollaboratorRole,
   type DocumentContentResponse,
   type RevisionHistoryItem,
@@ -17,6 +19,7 @@ import {
   Link,
   Maximize2,
   MessageSquarePlus,
+  Presentation,
   Minimize2,
   Redo2,
   RotateCcw,
@@ -51,6 +54,8 @@ import {
   type CollaborationTransport,
 } from './collaborative-editor.js';
 import { MarkdownPreview } from './MarkdownPreview.js';
+import { BlackboardPanel } from './BlackboardPanel.js';
+import { hashBlackboards, serializeBlackboards } from './blackboard-state.js';
 import { createStandaloneEditor } from './standalone-editor.js';
 
 type DocumentEditorProps = {
@@ -64,10 +69,17 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const editorRef = useRef<CollaborativeEditor | null>(null);
   const restoringEditorRef = useRef(false);
   const savedContentRef = useRef('');
+  const blackboardsRef = useRef<BlackboardSnapshot[]>([]);
+  const savedBlackboardsRef = useRef('[]');
   const standaloneBaseRevisionIdRef = useRef<string | null>(null);
   const initialDocumentRef = useRef<DocumentContentResponse | null>(null);
   const initialDocumentIdRef = useRef(documentId);
   const [content, setContent] = useState('');
+  const [blackboards, setBlackboards] = useState<BlackboardSnapshot[]>([]);
+  const [activeBlackboardId, setActiveBlackboardId] = useState<string | null>(
+    null,
+  );
+  const [blackboardVisible, setBlackboardVisible] = useState(false);
   const [editorGeneration, setEditorGeneration] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [revisionOrdinal, setRevisionOrdinal] = useState(0);
@@ -102,15 +114,27 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const applyCheckpoint = async (
     checkpoint: CollaborationCheckpointEvent,
     acknowledgedContent?: string,
+    acknowledgedBlackboards?: BlackboardSnapshot[],
   ) => {
     const currentContent = editorRef.current?.getContent() ?? '';
+    const currentBlackboards = editorRef.current?.getBlackboards?.() ?? [];
     const savedContent = acknowledgedContent ?? currentContent;
-    const matches =
+    const contentMatches =
       acknowledgedContent !== undefined ||
       (await contentMatchesHash(currentContent, checkpoint.contentHash));
-    if (matches) {
+    const blackboardsMatch =
+      acknowledgedBlackboards !== undefined ||
+      (await hashBlackboards(currentBlackboards)) === checkpoint.blackboardHash;
+    if (contentMatches && blackboardsMatch) {
       savedContentRef.current = savedContent;
-      setDirty(editorRef.current?.getContent() !== savedContent);
+      savedBlackboardsRef.current = serializeBlackboards(
+        acknowledgedBlackboards ?? currentBlackboards,
+      );
+      setDirty(
+        editorRef.current?.getContent() !== savedContent ||
+          serializeBlackboards(editorRef.current?.getBlackboards?.() ?? []) !==
+            savedBlackboardsRef.current,
+      );
       queryClient.setQueryData<DocumentContentResponse>(
         ['documents', documentId],
         (current) =>
@@ -165,10 +189,12 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
       }
       await editor.prepareCheckpoint();
       const acknowledgedContent = editor.getContent();
+      const acknowledgedBlackboards = editor.getBlackboards?.() ?? [];
       return {
         mode: 'collaborative' as const,
         result: await checkpointCollaboration(documentId, saveMessage),
         acknowledgedContent,
+        acknowledgedBlackboards,
       };
     },
     onSuccess: async (saveResult) => {
@@ -203,8 +229,10 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
           type: 'checkpoint',
           ...saveResult.result.currentRevision,
           contentHash: saveResult.result.contentHash,
+          blackboardHash: saveResult.result.blackboardHash,
         }),
         saveResult.acknowledgedContent,
+        saveResult.acknowledgedBlackboards,
       );
     },
     onError: (error) => setNotice(messageFor(error)),
@@ -219,7 +247,12 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     let receivedAuthoritativeContent = false;
 
     savedContentRef.current = initial.content;
+    blackboardsRef.current = [];
+    savedBlackboardsRef.current = '[]';
     setContent(initial.content);
+    setBlackboards([]);
+    setActiveBlackboardId(null);
+    setBlackboardVisible(false);
     setDirty(false);
     setRevisionOrdinal(initial.currentRevision.ordinal);
     setPermission(initial.permission);
@@ -256,11 +289,43 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
           receivedAuthoritativeContent = true;
           restoringEditorRef.current = false;
           savedContentRef.current = nextContent;
-          setDirty(false);
+          setDirty(
+            serializeBlackboards(blackboardsRef.current) !==
+              savedBlackboardsRef.current,
+          );
           setNotice('Saved');
           return;
         }
-        setDirty(nextContent !== savedContentRef.current);
+        setDirty(
+          nextContent !== savedContentRef.current ||
+            serializeBlackboards(blackboardsRef.current) !==
+              savedBlackboardsRef.current,
+        );
+        setNotice(null);
+      },
+      onBlackboardsChange: (nextBlackboards) => {
+        if (!active) return;
+        blackboardsRef.current = nextBlackboards;
+        setBlackboards(nextBlackboards);
+        setActiveBlackboardId((current) =>
+          current !== null &&
+          nextBlackboards.some((board) => board.id === current)
+            ? current
+            : (nextBlackboards[0]?.id ?? null),
+        );
+        const serialized = serializeBlackboards(nextBlackboards);
+        if (
+          savedBlackboardsRef.current === '[]' &&
+          nextBlackboards.length > 0 &&
+          !receivedAuthoritativeContent
+        ) {
+          savedBlackboardsRef.current = serialized;
+        }
+        setDirty(
+          (editorRef.current?.getContent() ?? initial.content) !==
+            savedContentRef.current ||
+            serialized !== savedBlackboardsRef.current,
+        );
         setNotice(null);
       },
       onError: (message) => {
@@ -415,6 +480,15 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
     }
   };
 
+  const runBlackboardAction = (action: () => void) => {
+    try {
+      action();
+      setNotice(null);
+    } catch (error) {
+      setNotice(messageFor(error));
+    }
+  };
+
   return (
     <main
       className={`document-editor-shell${fullScreen ? ' full-screen' : ''}`}
@@ -449,6 +523,24 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
                 : `Revision ${revisionOrdinal}`}
           </span>
           <button
+            className="icon-button"
+            type="button"
+            aria-label={
+              blackboardVisible ? 'Show Markdown editor' : 'Show blackboards'
+            }
+            aria-pressed={blackboardVisible}
+            title={
+              blackboardVisible ? 'Show Markdown editor' : 'Show blackboards'
+            }
+            disabled={transport === 'offline'}
+            onClick={() => {
+              setSourceVisible(false);
+              setBlackboardVisible((current) => !current);
+            }}
+          >
+            <Presentation size={18} />
+          </button>
+          <button
             className="icon-button editor-full-screen-button"
             type="button"
             aria-label={fullScreen ? 'Exit full screen' : 'Enter full screen'}
@@ -468,7 +560,10 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             title={
               sourceVisible ? 'Show rendered editor' : 'Show Markdown source'
             }
-            onClick={() => setSourceVisible((current) => !current)}
+            onClick={() => {
+              setBlackboardVisible(false);
+              setSourceVisible((current) => !current);
+            }}
           >
             <Code2 size={18} />
           </button>
@@ -555,6 +650,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
         className="editor-canvas"
         aria-label="Collaborative Markdown editor"
         hidden={sourceVisible}
+        style={{ display: blackboardVisible ? 'none' : undefined }}
       >
         <div ref={editorHostRef} className="milkdown-host" />
       </section>
@@ -568,6 +664,71 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             <code>{content}</code>
           </pre>
         </section>
+      )}
+      {blackboardVisible && (
+        <BlackboardPanel
+          activeBlackboardId={activeBlackboardId}
+          blackboards={blackboards}
+          currentMarkdown={editorRef.current?.getContent() ?? content}
+          readOnly={readOnly}
+          onSelect={setActiveBlackboardId}
+          onCreate={async (name, backgroundMarkdown) => {
+            const editor = editorRef.current;
+            if (editor?.createBlackboard === undefined) {
+              throw new Error('Blackboards require collaboration.');
+            }
+            return editor.createBlackboard(name, backgroundMarkdown);
+          }}
+          onRename={(blackboardId, name) =>
+            runBlackboardAction(() =>
+              editorRef.current?.renameBlackboard?.(blackboardId, name),
+            )
+          }
+          onDelete={(blackboardId) =>
+            runBlackboardAction(() =>
+              editorRef.current?.deleteBlackboard?.(blackboardId),
+            )
+          }
+          onClear={(blackboardId) =>
+            runBlackboardAction(() =>
+              editorRef.current?.clearBlackboard?.(blackboardId),
+            )
+          }
+          onAddStroke={(blackboardId, stroke: BlackboardStroke) =>
+            runBlackboardAction(() =>
+              editorRef.current?.addBlackboardStroke?.(blackboardId, stroke),
+            )
+          }
+          onDeleteStrokes={(blackboardId, strokeIds) =>
+            runBlackboardAction(() =>
+              editorRef.current?.deleteBlackboardStrokes?.(
+                blackboardId,
+                strokeIds,
+              ),
+            )
+          }
+          onMoveStrokes={(blackboardId, strokeIds, deltaX, deltaY) =>
+            runBlackboardAction(() =>
+              editorRef.current?.moveBlackboardStrokes?.(
+                blackboardId,
+                strokeIds,
+                deltaX,
+                deltaY,
+              ),
+            )
+          }
+          onReorder={(blackboardId, targetIndex) =>
+            runBlackboardAction(() =>
+              editorRef.current?.reorderBlackboard?.(blackboardId, targetIndex),
+            )
+          }
+          onUndo={() =>
+            runBlackboardAction(() => editorRef.current?.undoBlackboard?.())
+          }
+          onRedo={() =>
+            runBlackboardAction(() => editorRef.current?.redoBlackboard?.())
+          }
+        />
       )}
       <footer className="editor-footer">
         <span>Revision {revisionOrdinal}</span>
@@ -606,6 +767,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
                 type: 'checkpoint',
                 ...checkpoint.currentRevision,
                 contentHash: checkpoint.contentHash,
+                blackboardHash: checkpoint.blackboardHash,
               }),
             );
             setHistoryOpen(false);
@@ -695,6 +857,9 @@ function HistoryDialog({
     useState<RevisionHistoryItem | null>(null);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [historyBlackboardId, setHistoryBlackboardId] = useState<string | null>(
+    null,
+  );
   const revisionsQuery = useQuery({
     queryKey: ['documents', documentId, 'revisions'],
     queryFn: () => loadRevisions(documentId),
@@ -754,6 +919,7 @@ function HistoryDialog({
                   aria-label={`Revision ${revision.ordinal}, ${revision.saveMessage ?? 'No message'}`}
                   onClick={() => {
                     setSelectedRevision(revision);
+                    setHistoryBlackboardId(null);
                     setConfirmingRestore(false);
                     setNotice(null);
                   }}
@@ -778,6 +944,28 @@ function HistoryDialog({
             ) : (
               <>
                 <MarkdownPreview content={revisionQuery.data.content} />
+                {revisionQuery.data.blackboards.length > 0 && (
+                  <div className="history-blackboards">
+                    <h3>Saved blackboards</h3>
+                    <BlackboardPanel
+                      activeBlackboardId={historyBlackboardId}
+                      blackboards={revisionQuery.data.blackboards}
+                      currentMarkdown={revisionQuery.data.content}
+                      readOnly
+                      onSelect={setHistoryBlackboardId}
+                      onCreate={() => Promise.reject(new Error('Read only'))}
+                      onRename={() => {}}
+                      onDelete={() => {}}
+                      onClear={() => {}}
+                      onAddStroke={() => {}}
+                      onDeleteStrokes={() => {}}
+                      onMoveStrokes={() => {}}
+                      onReorder={() => {}}
+                      onUndo={() => {}}
+                      onRedo={() => {}}
+                    />
+                  </div>
+                )}
                 {selectedRevision.id !== currentRevisionId && (
                   <div className="history-actions">
                     {confirmingRestore ? (

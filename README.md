@@ -8,7 +8,7 @@ The repository includes a runnable React application, shared Zod contracts, a Fa
 
 - Email/password registration, login, logout, and revocable sessions
 - Personal hierarchical folders and Markdown documents
-- Rendered-in-place Milkdown/Yjs editing with rich formatting, local inline/display KaTeX, Undo/Redo, full-screen mode, bounded Mermaid previews, constrained visual flowchart controls, and explicit Save states
+- Rendered-in-place Milkdown/Yjs editing with rich formatting, local inline/display KaTeX, Undo/Redo, full-screen mode, bounded Mermaid previews, constrained visual flowchart controls, multi-board frozen-Markdown drawing with pressure, lasso, shapes, pan/zoom, and explicit Save states
 - Immutable revision snapshots with history and restore
 - Direct document sharing with `owner`, `editor`, or `viewer` access
 - Owner-managed, revocable public links to the current saved revision

@@ -63,6 +63,24 @@ TeamMD gives individuals and small teams a dependable place to organize, edit, s
 - **REQ-EDIT-021:** An authorized user can inspect the current canonical Markdown in a read-only whole-document source view and copy it as plain text. Switching views does not recreate Milkdown or introduce a parallel writable document root.
 - **REQ-EDIT-022:** The first local edit to an authoritative empty collaboration room, including pasted Markdown, immediately marks the draft unsaved and enables Save. Static history/public rendering recognizes inline formulas whose source begins with a digit under the same bounded local KaTeX policy.
 
+### Planned Blackboard Mode
+
+Blackboard mode is a document-scoped collection of lightweight visual workspaces. When a blackboard is first created, it receives a read-only copy of the document's current Markdown as its background. Blackboards are intended primarily for short-lived teaching, meeting, and explanation sessions. It is a planned post-rendered-editor capability and is not part of the current release.
+
+- **REQ-BOARD-001:** An authorized user can switch one Markdown document between the normal editor and any of its blackboards without creating another Markdown document, replacing the Markdown source, remounting the collaboration session, or losing unsaved work.
+- **REQ-BOARD-002:** Owners and editors can create multiple blackboards for the same Markdown document and rename, reorder, clear, or delete them. Each blackboard has a stable opaque ID and a bounded display name that is unique case-insensitively within the document; collection changes participate in Undo/Redo and dirty state.
+- **REQ-BOARD-003:** When a blackboard is created or first opened if it has not yet been initialized, the server-authoritative current Markdown is copied into that blackboard as an immutable read-only background. Later openings reuse the stored copy; later edits to the main Markdown do not change it.
+- **REQ-BOARD-004:** Every blackboard renders its copied Markdown on a stable logical sheet and owns an independent transparent vector drawing layer above it. Zooming, panning, resizing, switching blackboards, and device-pixel-ratio changes do not alter the copied background or saved stroke geometry.
+- **REQ-BOARD-005:** Owners and editors can draw with a pressure-aware pen and highlighter, create straight lines, rectangles, ellipses, and arrows, choose bounded colors and widths, erase strokes, select individual strokes or lasso a group, move or delete the selection as one undoable operation, and undo or redo their own blackboard operations. Viewers can navigate, zoom, pan, and inspect saved blackboards but receive no durable mutation controls.
+- **REQ-BOARD-006:** Authorized collaborators in the same document see blackboard collection and drawing changes converge in real time through the authenticated document room, including when they work on different blackboards. Active-board choice and drawing presence may be ephemeral, but copied backgrounds, blackboard metadata, and strokes are durable operational state and use the same authorization, revocation, generation, and reconnect rules as Markdown edits.
+- **REQ-BOARD-007:** The main Markdown and all blackboards share one dirty state and one explicit Save action. A successful Save atomically creates one immutable document revision containing canonical Markdown plus the matching versioned snapshot of the complete blackboard collection, including every copied background; a partial checkpoint must not advance the document head.
+- **REQ-BOARD-008:** Restoring a revision restores both its main Markdown and its complete blackboard collection, including copied backgrounds, as a new head revision. Revisions created before blackboard support behave as having no blackboards and are never rewritten.
+- **REQ-BOARD-009:** Switching modes or blackboards, entering full screen, reconnecting, or navigating within the document does not rasterize strokes, flatten them into Markdown, refresh a copied background, or silently discard either content type. Plain Markdown export returns the main document source and does not claim to contain supplementary blackboards or their copies.
+- **REQ-BOARD-010:** Blackboard input accepts pointer, mouse, touch, and stylus events where the browser exposes them, normalizes available pressure into bounded vector points, and provides a drag-pan mode that does not mutate saved geometry. Blackboard tabs and drawing controls have accessible names, visible keyboard focus, and keyboard activation; non-pointer users can create, rename, switch, reorder, clear, and delete blackboards and remove selected strokes.
+- **REQ-BOARD-011:** The client and server enforce documented per-blackboard and per-document limits for blackboard count, copied-Markdown bytes, logical canvas bounds, stroke count, points per stroke, coordinate precision, update size, and aggregate saved blackboard bytes. Invalid background or geometry data is rejected without corrupting the last saved revision, and copied Markdown, blackboard names, and drawing content are not written to logs.
+- **REQ-BOARD-012:** Initial blackboard history views list the blackboards captured by the selected revision and render each saved layer read-only over its stored Markdown copy. Anonymous public links continue to expose only the current saved main Markdown and revision summary until blackboard publication receives a separate privacy and abuse review.
+- **REQ-BOARD-013:** Updating the main Markdown never updates an existing blackboard copy. To use newer Markdown, an editor creates another blackboard; background refresh and drawing migration are intentionally excluded from the initial workflow.
+
 ### Sharing
 
 The current release supports direct sharing to an existing registered account and revocable read-only public links. Tokenized pending-email invitations and email delivery remain planned follow-up work.
@@ -92,6 +110,7 @@ The current release supports direct sharing to an existing registered account an
 5. A viewer cannot mutate content even by calling the API directly.
 6. Trashing a folder removes its descendants from normal listings without deleting revision history. Restore returns the subtree when its parent is valid.
 7. An owner creates a public link, an anonymous browser reads only the current saved revision, and the same token returns a generic unavailable response after revocation.
+8. Two editors create and draw on different blackboards over the same Markdown document, converge on the same named collection, and Save one matching Markdown-and-blackboard revision. A later main Markdown edit does not change either stored blackboard background; a newly created board receives the newer Markdown copy. Restoring an earlier revision restores its main Markdown and exact blackboard collection.
 
 ## Non-Functional Requirements
 
@@ -108,7 +127,7 @@ The current release supports direct sharing to an existing registered account an
 - Comments, suggestions, mentions, and notifications beyond invitation email
 - Folder-level sharing or inherited access control
 - Byte-for-byte preservation of insignificant Markdown formatting such as equivalent list markers or whitespace; semantic preservation of the supported Markdown flavor remains required
-- Binary attachments, image hosting, publishing, plugins, or arbitrary HTML execution
+- General-purpose binary attachments, image hosting, publishing, plugins, or arbitrary HTML execution. The planned blackboard stores bounded vector operations associated with a document revision, not uploaded binary files.
 - Native mobile or desktop applications
 
 ## Success Metrics
@@ -126,6 +145,8 @@ The current release supports direct sharing to an existing registered account an
 - Storage quotas by user and revision count.
 - Whether collaborator access survives an owner's trash action or remains suspended until restore.
 - Exact Markdown flavor and Milkdown extension set; the migration must define these before automatic room conversion is enabled.
+- Whether later demand justifies refreshing an existing blackboard from newer Markdown and migrating its strokes; the initial workflow creates a new blackboard instead.
+- Whether blackboard content should have a separate export format and whether an owner may opt it into public-link rendering after privacy, sanitization, and resource-limit review.
 
 ## Deferred Offline-First Decision
 

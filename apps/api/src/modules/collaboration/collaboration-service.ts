@@ -253,6 +253,28 @@ export class CollaborationService {
     return converted.count === 1;
   }
 
+  public async convertMilkdownState(
+    documentId: string,
+    yjsState: Uint8Array,
+  ): Promise<boolean> {
+    if (yjsState.byteLength > maximumYjsStateBytes) {
+      throw new ApiError(
+        413,
+        'VALIDATION_ERROR',
+        'The collaborative document state is too large.',
+      );
+    }
+    const converted = await this.prisma.collaborationState.updateMany({
+      where: { documentId, stateFormat: 'MILKDOWN_XML_V1' },
+      data: {
+        generation: { increment: 1 },
+        stateFormat: 'MILKDOWN_BLACKBOARDS_V1',
+        yjsState: Buffer.from(yjsState),
+      },
+    });
+    return converted.count === 1;
+  }
+
   public async getCheckpointRevisionId(documentId: string): Promise<string> {
     const state = await this.prisma.collaborationState.findUnique({
       where: { documentId },
@@ -267,14 +289,20 @@ export class CollaborationService {
 
 function toStoredStateFormat(
   format: CollaborationStateFormat,
-): 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1' {
-  return format === 'legacy-text-v1' ? 'LEGACY_TEXT_V1' : 'MILKDOWN_XML_V1';
+): 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1' | 'MILKDOWN_BLACKBOARDS_V1' {
+  if (format === 'legacy-text-v1') return 'LEGACY_TEXT_V1';
+  return format === 'milkdown-xml-v1'
+    ? 'MILKDOWN_XML_V1'
+    : 'MILKDOWN_BLACKBOARDS_V1';
 }
 
 function fromStoredStateFormat(
-  format: 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1',
+  format: 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1' | 'MILKDOWN_BLACKBOARDS_V1',
 ): CollaborationStateFormat {
-  return format === 'LEGACY_TEXT_V1' ? 'legacy-text-v1' : 'milkdown-xml-v1';
+  if (format === 'LEGACY_TEXT_V1') return 'legacy-text-v1';
+  return format === 'MILKDOWN_XML_V1'
+    ? 'milkdown-xml-v1'
+    : 'milkdown-blackboards-v1';
 }
 
 function protocolMismatch(stateFormat: CollaborationStateFormat): ApiError {

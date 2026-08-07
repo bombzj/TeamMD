@@ -12,6 +12,7 @@ erDiagram
   Folder ||--o{ Folder : contains
   Folder ||--o{ Document : contains
   Document ||--|{ DocumentRevision : versions
+  DocumentRevision ||--o{ DocumentRevisionBlackboard : captures
   User ||--o{ DocumentRevision : authors
   Document ||--o{ DocumentAccess : grants
   User ||--o{ DocumentAccess : receives
@@ -86,6 +87,18 @@ Document name uniqueness follows the same active sibling strategy as folders. Fo
 | `createdAt`               | Immutable timestamp                                             |
 
 No update or delete operation is exposed for a revision. Creation and document-head advancement occur in one transaction. `contentHash` helps integrity and deduplication analysis but does not replace authorization or revision identity.
+
+### `DocumentRevisionBlackboard`
+
+| Field                                                        | Notes                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `revisionId`, `blackboardId`                                 | Composite identity; stable board UUID within document history |
+| `name`, `sortOrder`                                          | Bounded display metadata captured by this revision            |
+| `backgroundMarkdown`, `backgroundByteSize`, `backgroundHash` | Immutable read-only Markdown copy captured at board creation  |
+| `drawingPayload`, `drawingByteSize`, `drawingHash`           | Versioned validated vector-stroke snapshot and integrity data |
+| `createdAt`                                                  | Immutable timestamp                                           |
+
+Rows cascade only with their owning immutable revision. Background and drawing byte sizes count toward blackboard collection limits; neither payload is emitted to logs or audit metadata.
 
 ### `DocumentAccess`
 
@@ -176,6 +189,16 @@ Existing revisions are never updated. A stale local CRDT document is never merge
 ## Live-State Format Migration
 
 Existing rows default to `LEGACY_TEXT_V1`. A conversion acquires the document/room serialization boundary, extracts the full legacy shared draft, verifies that the configured Milkdown schema can parse and semantically round-trip it, creates a fresh `MILKDOWN_XML_V1` document, increments `generation`, and persists format plus state atomically. A lossy document is not converted automatically. Immutable `DocumentRevision.content` rows are never changed by this operation.
+
+## Blackboard Persistence
+
+Blackboard mode adds a supplementary collection of named vector blackboards to the same document collaboration generation. Each blackboard has a stable opaque ID, bounded metadata, an immutable read-only copy of the server-authoritative Markdown captured when it is initialized, and an independent stroke layer. The stored copy is not a second writable document and is never refreshed when the main Markdown changes. The `MILKDOWN_BLACKBOARDS_V1` format is negotiated explicitly so incompatible clients cannot enter the room.
+
+The immutable model uses zero-to-many `DocumentRevisionBlackboard` rows with a unique `(revisionId, blackboardId)` key. Each row contains the stable blackboard ID, bounded name and ordering metadata, immutable `backgroundMarkdown`, `backgroundByteSize`, `backgroundHash`, a versioned bounded vector payload, drawing byte size and hash, and creation timestamp. A revision with no rows has no blackboards, which preserves the meaning of every existing revision without backfilling or rewriting it. Copied Markdown counts toward per-board and aggregate document limits.
+
+Operational blackboard structures live in a documented Yjs map keyed by blackboard ID inside the authenticated document room and are compacted with `CollaborationState`; they are not revision history by themselves. Explicit Save must read one authoritative room state, serialize canonical Markdown and the complete matching blackboard collection, insert the `DocumentRevision` and its zero or more `DocumentRevisionBlackboard` rows, advance the document head and collaboration checkpoint, and append the audit event in one transaction. Restore must rebuild the Markdown and exact blackboard collection, increment `generation`, and disconnect stale clients under the existing restore boundary.
+
+Permanent document deletion cascades blackboard operational and revision data under the same retention policy as Markdown revisions. Logs, audit metadata, and error envelopes never include stroke coordinates or serialized drawing payloads.
 
 ## Deletion And Retention
 

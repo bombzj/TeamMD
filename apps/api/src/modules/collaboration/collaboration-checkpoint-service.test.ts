@@ -10,6 +10,10 @@ import type {
   CollaborationService,
 } from './collaboration-service.js';
 import { getMilkdownCodec } from './milkdown-codec.js';
+import {
+  blackboardCollectionHash,
+  writeBlackboards,
+} from './blackboard-state.js';
 
 const documentId = 'cm1234567890documentabcde';
 const userId = 'cm1234567890userabcdefgh';
@@ -27,6 +31,7 @@ const savedRevision = {
   ordinal: 2,
   createdAt: '2026-07-28T00:05:00.000Z',
 };
+const emptyBlackboardHash = createHash('sha256').update('[]').digest('hex');
 
 describe('CollaborationCheckpointService', () => {
   it('saves the authoritative room snapshot and broadcasts its revision', async () => {
@@ -78,17 +83,20 @@ describe('CollaborationCheckpointService', () => {
       { baseRevisionId, content: roomContent },
       'request-1',
       true,
+      [],
     );
     expect(result).toEqual({
       documentId,
       currentRevision: savedRevision,
       contentHash,
+      blackboardHash: emptyBlackboardHash,
     });
     expect(broadcastStateless).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'checkpoint',
         ...savedRevision,
         contentHash,
+        blackboardHash: emptyBlackboardHash,
       }),
     );
 
@@ -127,7 +135,9 @@ describe('CollaborationCheckpointService', () => {
         storeState,
       } as unknown as CollaborationService,
       {
-        getRevision: vi.fn().mockResolvedValue({ content: historicalContent }),
+        getRevision: vi
+          .fn()
+          .mockResolvedValue({ content: historicalContent, blackboards: [] }),
         restoreRevision,
       } as unknown as WorkspaceService,
     );
@@ -156,12 +166,14 @@ describe('CollaborationCheckpointService', () => {
       documentId,
       currentRevision: restoredRevision,
       contentHash,
+      blackboardHash: emptyBlackboardHash,
     });
     expect(broadcastStateless).toHaveBeenCalledWith(
       JSON.stringify({
         type: 'document-restored',
         ...restoredRevision,
         contentHash,
+        blackboardHash: emptyBlackboardHash,
       }),
     );
     expect(closeConnections).toHaveBeenCalledWith(documentId);
@@ -197,7 +209,9 @@ describe('CollaborationCheckpointService', () => {
       } as unknown as CollaborationService,
       {
         saveDocument,
-        getRevision: vi.fn().mockResolvedValue({ content: restoredContent }),
+        getRevision: vi
+          .fn()
+          .mockResolvedValue({ content: restoredContent, blackboards: [] }),
         restoreRevision: vi.fn().mockResolvedValue({
           documentId,
           currentRevision: savedRevision,
@@ -212,6 +226,7 @@ describe('CollaborationCheckpointService', () => {
       { baseRevisionId, content: roomContent },
       'request-structured',
       true,
+      [],
     );
 
     await service.restoreRevision(
@@ -225,6 +240,64 @@ describe('CollaborationCheckpointService', () => {
     expect(room.getText('content').length).toBe(0);
 
     await roomConnection.disconnect();
+    initialDocument.destroy();
+  });
+
+  it('checkpoints frozen blackboard backgrounds from the authoritative room', async () => {
+    const codec = await getMilkdownCodec();
+    const initialDocument = new Y.Doc();
+    Y.applyUpdate(initialDocument, codec.createState(roomContent));
+    const board = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Board 1',
+      order: 0,
+      backgroundMarkdown: roomContent,
+      backgroundHash: createHash('sha256').update(roomContent).digest('hex'),
+      strokes: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          tool: 'pen' as const,
+          color: '#112233',
+          width: 4,
+          points: [{ x: 10, y: 20, pressure: 0.5 }],
+        },
+      ],
+    };
+    writeBlackboards(initialDocument, [board]);
+    const saveDocument = vi.fn().mockResolvedValue({
+      documentId,
+      currentRevision: savedRevision,
+    });
+    const collaboration = new Hocuspocus<CollaborationContext>({
+      onLoadDocument() {
+        return Promise.resolve(Y.encodeStateAsUpdate(initialDocument));
+      },
+    });
+    const service = new CollaborationCheckpointService(
+      collaboration,
+      {
+        getStateFormat: vi.fn().mockResolvedValue('milkdown-blackboards-v1'),
+        storeState: vi.fn().mockResolvedValue(undefined),
+        getCheckpointRevisionId: vi.fn().mockResolvedValue(baseRevisionId),
+      } as unknown as CollaborationService,
+      { saveDocument } as unknown as WorkspaceService,
+    );
+
+    const result = await service.checkpoint(
+      userId,
+      documentId,
+      {},
+      'request-blackboard',
+    );
+    expect(saveDocument).toHaveBeenCalledWith(
+      userId,
+      documentId,
+      { baseRevisionId, content: roomContent },
+      'request-blackboard',
+      true,
+      [board],
+    );
+    expect(result.blackboardHash).toBe(blackboardCollectionHash([board]));
     initialDocument.destroy();
   });
 

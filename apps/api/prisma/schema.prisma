@@ -8,40 +8,40 @@ datasource db {
 }
 
 model User {
-  id               String       @id @default(cuid()) @db.VarChar(30)
-  email            String       @db.VarChar(320)
-  normalizedEmail  String       @unique @db.VarChar(320)
-  passwordHash     String       @db.VarChar(512)
-  emailVerifiedAt  DateTime?    @db.DateTime(3)
-  sessionEpoch     Int          @default(0)
-  createdAt        DateTime     @default(now()) @db.DateTime(3)
-  updatedAt        DateTime     @updatedAt @db.DateTime(3)
-  disabledAt       DateTime?    @db.DateTime(3)
-  sessions         Session[]
-  auditEvents       AuditEvent[]
-  folders           Folder[]
-  documents         Document[]
-  documentRevisions DocumentRevision[]
-  documentAccesses  DocumentAccess[]   @relation("AccessRecipient")
-  accessGrants      DocumentAccess[]   @relation("AccessGrantor")
+  id                   String                @id @default(cuid()) @db.VarChar(30)
+  email                String                @db.VarChar(320)
+  normalizedEmail      String                @unique @db.VarChar(320)
+  passwordHash         String                @db.VarChar(512)
+  emailVerifiedAt      DateTime?             @db.DateTime(3)
+  sessionEpoch         Int                   @default(0)
+  createdAt            DateTime              @default(now()) @db.DateTime(3)
+  updatedAt            DateTime              @updatedAt @db.DateTime(3)
+  disabledAt           DateTime?             @db.DateTime(3)
+  sessions             Session[]
+  auditEvents          AuditEvent[]
+  folders              Folder[]
+  documents            Document[]
+  documentRevisions    DocumentRevision[]
+  documentAccesses     DocumentAccess[]      @relation("AccessRecipient")
+  accessGrants         DocumentAccess[]      @relation("AccessGrantor")
   collaborationTickets CollaborationTicket[]
 
   @@index([disabledAt])
 }
 
 model Session {
-  id               String    @id @default(cuid()) @db.VarChar(30)
-  userId           String    @db.VarChar(30)
-  tokenHash        String    @unique @db.Char(64)
-  csrfTokenHash    String    @db.Char(64)
-  sessionEpoch     Int
-  expiresAt        DateTime  @db.DateTime(3)
-  lastSeenAt       DateTime  @default(now()) @db.DateTime(3)
-  revokedAt        DateTime? @db.DateTime(3)
-  userAgentSummary String?   @db.VarChar(255)
-  ipPrefixHash     String?   @db.Char(64)
-  createdAt        DateTime  @default(now()) @db.DateTime(3)
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String                @id @default(cuid()) @db.VarChar(30)
+  userId               String                @db.VarChar(30)
+  tokenHash            String                @unique @db.Char(64)
+  csrfTokenHash        String                @db.Char(64)
+  sessionEpoch         Int
+  expiresAt            DateTime              @db.DateTime(3)
+  lastSeenAt           DateTime              @default(now()) @db.DateTime(3)
+  revokedAt            DateTime?             @db.DateTime(3)
+  userAgentSummary     String?               @db.VarChar(255)
+  ipPrefixHash         String?               @db.Char(64)
+  createdAt            DateTime              @default(now()) @db.DateTime(3)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   collaborationTickets CollaborationTicket[]
 
   @@index([userId, revokedAt, expiresAt])
@@ -62,44 +62,44 @@ model AuditEvent {
 }
 
 model Folder {
-  id            String    @id @default(cuid()) @db.VarChar(30)
-  ownerId       String    @db.VarChar(30)
-  parentId      String?   @db.VarChar(30)
-  name          String    @db.VarChar(255)
-  normalizedName String   @db.VarChar(255)
-  parentKey     String    @db.VarChar(30)
-  activeNameKey String?   @db.VarChar(255)
-  createdAt     DateTime  @default(now()) @db.DateTime(3)
-  updatedAt     DateTime  @updatedAt @db.DateTime(3)
-  trashedAt     DateTime? @db.DateTime(3)
-  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent        Folder?   @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Restrict)
-  children      Folder[]  @relation("FolderChildren")
-  documents     Document[]
+  id             String     @id @default(cuid()) @db.VarChar(30)
+  ownerId        String     @db.VarChar(30)
+  parentId       String?    @db.VarChar(30)
+  name           String     @db.VarChar(255)
+  normalizedName String     @db.VarChar(255)
+  parentKey      String     @db.VarChar(30)
+  activeNameKey  String?    @db.VarChar(255)
+  createdAt      DateTime   @default(now()) @db.DateTime(3)
+  updatedAt      DateTime   @updatedAt @db.DateTime(3)
+  trashedAt      DateTime?  @db.DateTime(3)
+  owner          User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent         Folder?    @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Restrict)
+  children       Folder[]   @relation("FolderChildren")
+  documents      Document[]
 
   @@unique([ownerId, parentKey, activeNameKey])
   @@index([ownerId, parentId, trashedAt])
 }
 
 model Document {
-  id                String             @id @default(cuid()) @db.VarChar(30)
-  ownerId           String             @db.VarChar(30)
-  folderId          String?            @db.VarChar(30)
-  name              String             @db.VarChar(255)
-  normalizedName    String             @db.VarChar(255)
-  parentKey         String             @db.VarChar(30)
-  activeNameKey     String?            @db.VarChar(255)
-  currentRevisionId String?            @db.VarChar(30)
-  createdAt         DateTime           @default(now()) @db.DateTime(3)
-  updatedAt         DateTime           @updatedAt @db.DateTime(3)
-  trashedAt         DateTime?          @db.DateTime(3)
-  owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  folder            Folder?            @relation(fields: [folderId], references: [id], onDelete: Restrict)
-  revisions         DocumentRevision[]
-  accesses          DocumentAccess[]
-  collaborationState CollaborationState?
+  id                   String                @id @default(cuid()) @db.VarChar(30)
+  ownerId              String                @db.VarChar(30)
+  folderId             String?               @db.VarChar(30)
+  name                 String                @db.VarChar(255)
+  normalizedName       String                @db.VarChar(255)
+  parentKey            String                @db.VarChar(30)
+  activeNameKey        String?               @db.VarChar(255)
+  currentRevisionId    String?               @db.VarChar(30)
+  createdAt            DateTime              @default(now()) @db.DateTime(3)
+  updatedAt            DateTime              @updatedAt @db.DateTime(3)
+  trashedAt            DateTime?             @db.DateTime(3)
+  owner                User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder               Folder?               @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  revisions            DocumentRevision[]
+  accesses             DocumentAccess[]
+  collaborationState   CollaborationState?
   collaborationTickets CollaborationTicket[]
-  publicLink        DocumentPublicLink?
+  publicLink           DocumentPublicLink?
 
   @@unique([ownerId, parentKey, activeNameKey])
   @@index([ownerId, folderId, trashedAt])
@@ -112,7 +112,7 @@ enum DocumentAccessRole {
 }
 
 model DocumentAccess {
-  documentId String             @db.VarChar(30)
+  documentId  String             @db.VarChar(30)
   userId      String             @db.VarChar(30)
   role        DocumentAccessRole
   grantedById String             @db.VarChar(30)
@@ -128,52 +128,71 @@ model DocumentAccess {
 }
 
 model DocumentRevision {
-  id                     String             @id @default(cuid()) @db.VarChar(30)
-  documentId             String             @db.VarChar(30)
+  id                     String                       @id @default(cuid()) @db.VarChar(30)
+  documentId             String                       @db.VarChar(30)
   ordinal                Int
-  authorId               String             @db.VarChar(30)
-  content                String             @db.LongText
+  authorId               String                       @db.VarChar(30)
+  content                String                       @db.LongText
   byteSize               Int
-  contentHash            String             @db.Char(64)
-  saveMessage            String?            @db.VarChar(500)
-  restoredFromRevisionId String?            @db.VarChar(30)
-  createdAt              DateTime           @default(now()) @db.DateTime(3)
-  document               Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  author                 User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  restoredFrom           DocumentRevision?  @relation("RevisionRestore", fields: [restoredFromRevisionId], references: [id], onDelete: SetNull)
-  restoredAs             DocumentRevision[] @relation("RevisionRestore")
+  contentHash            String                       @db.Char(64)
+  saveMessage            String?                      @db.VarChar(500)
+  restoredFromRevisionId String?                      @db.VarChar(30)
+  createdAt              DateTime                     @default(now()) @db.DateTime(3)
+  document               Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author                 User                         @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  restoredFrom           DocumentRevision?            @relation("RevisionRestore", fields: [restoredFromRevisionId], references: [id], onDelete: SetNull)
+  restoredAs             DocumentRevision[]           @relation("RevisionRestore")
+  blackboards            DocumentRevisionBlackboard[]
 
   @@unique([documentId, ordinal])
   @@index([authorId, createdAt])
   @@index([restoredFromRevisionId])
 }
 
+model DocumentRevisionBlackboard {
+  revisionId         String           @db.VarChar(30)
+  blackboardId       String           @db.Char(36)
+  name               String           @db.VarChar(80)
+  sortOrder          Int
+  backgroundMarkdown String           @db.LongText
+  backgroundByteSize Int
+  backgroundHash     String           @db.Char(64)
+  drawingPayload     String           @db.LongText
+  drawingByteSize    Int
+  drawingHash        String           @db.Char(64)
+  createdAt          DateTime         @default(now()) @db.DateTime(3)
+  revision           DocumentRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@id([revisionId, blackboardId])
+  @@index([revisionId, sortOrder])
+}
+
 model CollaborationTicket {
-  id         String    @id @default(cuid()) @db.VarChar(30)
-  tokenHash  String    @unique @db.Char(64)
-  documentId String    @db.VarChar(30)
-  sessionId  String    @db.VarChar(30)
-  userId     String    @db.VarChar(30)
+  id          String                   @id @default(cuid()) @db.VarChar(30)
+  tokenHash   String                   @unique @db.Char(64)
+  documentId  String                   @db.VarChar(30)
+  sessionId   String                   @db.VarChar(30)
+  userId      String                   @db.VarChar(30)
   stateFormat CollaborationStateFormat @default(LEGACY_TEXT_V1)
-  expiresAt  DateTime  @db.DateTime(3)
-  consumedAt DateTime? @db.DateTime(3)
-  createdAt  DateTime  @default(now()) @db.DateTime(3)
-  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime                 @db.DateTime(3)
+  consumedAt  DateTime?                @db.DateTime(3)
+  createdAt   DateTime                 @default(now()) @db.DateTime(3)
+  document    Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  session     Session                  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([documentId, expiresAt])
   @@index([sessionId, consumedAt])
 }
 
 model CollaborationState {
-  documentId          String   @id @db.VarChar(30)
-  generation          Int      @default(1)
+  documentId           String                   @id @db.VarChar(30)
+  generation           Int                      @default(1)
   stateFormat          CollaborationStateFormat @default(LEGACY_TEXT_V1)
-  yjsState             Bytes    @db.LongBlob
-  checkpointRevisionId String   @db.VarChar(30)
-  updatedAt            DateTime @updatedAt @db.DateTime(3)
-  document             Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  yjsState             Bytes                    @db.LongBlob
+  checkpointRevisionId String                   @db.VarChar(30)
+  updatedAt            DateTime                 @updatedAt @db.DateTime(3)
+  document             Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([updatedAt])
 }
@@ -191,4 +210,5 @@ model DocumentPublicLink {
 enum CollaborationStateFormat {
   LEGACY_TEXT_V1
   MILKDOWN_XML_V1
+  MILKDOWN_BLACKBOARDS_V1
 }

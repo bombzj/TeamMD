@@ -296,7 +296,7 @@ export function registerWorkspaceRoutes(
     async (request, reply) => {
       const session = requireMutationSession(request, options);
       const body = collaborationTicketRequestSchema.parse(request.body);
-      if (body.editorProtocol === 'milkdown-xml-v1') {
+      if (body.editorProtocol !== 'legacy-text-v1') {
         if (options.collaborationCheckpointService === undefined) {
           throw new ApiError(
             503,
@@ -304,10 +304,17 @@ export function registerWorkspaceRoutes(
             'Collaboration migration is temporarily unavailable.',
           );
         }
-        await options.collaborationCheckpointService.migrateToMilkdown(
-          session.user.id,
-          request.params.documentId,
-        );
+        if (body.editorProtocol === 'milkdown-blackboards-v1') {
+          await options.collaborationCheckpointService.migrateToBlackboards(
+            session.user.id,
+            request.params.documentId,
+          );
+        } else {
+          await options.collaborationCheckpointService.migrateToMilkdown(
+            session.user.id,
+            request.params.documentId,
+          );
+        }
       }
       const result = await options.collaborationService.createTicket(
         session.user.id,

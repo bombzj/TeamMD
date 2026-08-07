@@ -122,9 +122,11 @@ class FakeWorkspaceService {
   public listRevisions = vi
     .fn()
     .mockResolvedValue({ revisions: [historyRevision] });
-  public getRevision = vi
-    .fn()
-    .mockResolvedValue({ ...historyRevision, content: '# TeamMD\n' });
+  public getRevision = vi.fn().mockResolvedValue({
+    ...historyRevision,
+    content: '# TeamMD\n',
+    blackboards: [],
+  });
   public saveDocument = vi.fn().mockResolvedValue(saveResponse);
   public updateDocument = vi.fn().mockResolvedValue(document);
   public trashDocument = vi.fn().mockResolvedValue(undefined);
@@ -145,15 +147,20 @@ class FakeCollaborationService {
 
 class FakeCollaborationCheckpointService {
   public migrateToMilkdown = vi.fn().mockResolvedValue(undefined);
+  public migrateToBlackboards = vi.fn().mockResolvedValue(undefined);
   public checkpoint = vi.fn().mockResolvedValue({
     ...saveResponse,
     contentHash:
       '5a20c83155116d212e04cd1301b39da22c04944de6c80fb6f17c1db0a9b037fc',
+    blackboardHash:
+      '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
   });
   public restoreRevision = vi.fn().mockResolvedValue({
     ...saveResponse,
     contentHash:
       '5a20c83155116d212e04cd1301b39da22c04944de6c80fb6f17c1db0a9b037fc',
+    blackboardHash:
+      '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
   });
 }
 
@@ -444,6 +451,40 @@ describe('workspace routes', () => {
       checkpointService.migrateToMilkdown.mock.invocationCallOrder[0],
     ).toBeLessThan(
       collaborationService.createTicket.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('migrates a structured room before issuing a blackboard ticket', async () => {
+    const collaborationService = new FakeCollaborationService();
+    collaborationService.createTicket.mockResolvedValueOnce({
+      ...(await collaborationService.createTicket()),
+      stateFormat: 'milkdown-blackboards-v1',
+    });
+    collaborationService.createTicket.mockClear();
+    const checkpointService = new FakeCollaborationCheckpointService();
+    const app = await createTestApp(
+      new FakeWorkspaceService(),
+      collaborationService,
+      checkpointService,
+    );
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/documents/${document.id}/collaboration-ticket`,
+      headers: authHeaders(),
+      payload: { editorProtocol: 'milkdown-blackboards-v1' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(checkpointService.migrateToBlackboards).toHaveBeenCalledWith(
+      userId,
+      document.id,
+    );
+    expect(collaborationService.createTicket).toHaveBeenCalledWith(
+      userId,
+      'cm1234567890sessionidxyz',
+      document.id,
+      config.collaborationUrl,
+      'milkdown-blackboards-v1',
     );
   });
 

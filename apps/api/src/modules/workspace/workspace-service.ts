@@ -1,4 +1,5 @@
 import type {
+  BlackboardSnapshot,
   CreateDocumentRequest,
   CreateFolderRequest,
   DocumentContentResponse,
@@ -14,10 +15,12 @@ import type {
   UpdateFolderRequest,
   WorkspaceTreeResponse,
 } from '@teammd/contracts';
+import { blackboardCollectionSchema } from '@teammd/contracts';
 import {
   Prisma,
   type Document,
   type DocumentRevision,
+  type DocumentRevisionBlackboard,
   type Folder,
   type PrismaClient,
 } from '@prisma/client';
@@ -26,6 +29,7 @@ import * as Y from 'yjs';
 
 import { ApiError } from '../../lib/api-error.js';
 import { getMilkdownCodec } from '../collaboration/milkdown-codec.js';
+import { writeBlackboards } from '../collaboration/blackboard-state.js';
 import { requireDocumentAccess } from './document-access-policy.js';
 
 const rootParentKey = '__root__';
@@ -418,10 +422,19 @@ export class WorkspaceService {
     await requireDocumentAccess(this.prisma, userId, documentId, 'write');
     const revision = await this.prisma.documentRevision.findFirst({
       where: { id: revisionId, documentId },
-      include: { author: { select: { email: true } } },
+      include: {
+        author: { select: { email: true } },
+        blackboards: {
+          orderBy: [{ sortOrder: 'asc' }, { blackboardId: 'asc' }],
+        },
+      },
     });
     if (revision === null) throw notFound('Document');
-    return { ...toRevisionHistoryItem(revision), content: revision.content };
+    return {
+      ...toRevisionHistoryItem(revision),
+      content: revision.content,
+      blackboards: toBlackboardSnapshots(revision.blackboards),
+    };
   }
 
   public async saveDocument(
@@ -430,6 +443,7 @@ export class WorkspaceService {
     input: SaveDocumentRequest,
     requestId: string,
     advanceCollaborationCheckpoint = false,
+    blackboards: BlackboardSnapshot[] = [],
   ): Promise<SaveDocumentResponse> {
     const byteSize = Buffer.byteLength(input.content, 'utf8');
     if (byteSize > maximumMarkdownBytes) {
@@ -493,6 +507,11 @@ export class WorkspaceService {
             : { saveMessage: input.saveMessage }),
         },
       });
+      if (blackboards.length > 0) {
+        await transaction.documentRevisionBlackboard.createMany({
+          data: blackboardRows(revision.id, blackboards),
+        });
+      }
       await transaction.document.update({
         where: { id: documentId },
         data: { currentRevisionId: revision.id },
@@ -552,6 +571,7 @@ export class WorkspaceService {
       }
       const sourceRevision = await transaction.documentRevision.findFirst({
         where: { id: revisionId, documentId },
+        include: { blackboards: true },
       });
       if (sourceRevision === null) throw notFound('Document');
 
@@ -569,6 +589,22 @@ export class WorkspaceService {
             : { saveMessage: input.saveMessage }),
         },
       });
+      if (sourceRevision.blackboards.length > 0) {
+        await transaction.documentRevisionBlackboard.createMany({
+          data: sourceRevision.blackboards.map((blackboard) => ({
+            revisionId: revision.id,
+            blackboardId: blackboard.blackboardId,
+            name: blackboard.name,
+            sortOrder: blackboard.sortOrder,
+            backgroundMarkdown: blackboard.backgroundMarkdown,
+            backgroundByteSize: blackboard.backgroundByteSize,
+            backgroundHash: blackboard.backgroundHash,
+            drawingPayload: blackboard.drawingPayload,
+            drawingByteSize: blackboard.drawingByteSize,
+            drawingHash: blackboard.drawingHash,
+          })),
+        });
+      }
       await transaction.document.update({
         where: { id: documentId },
         data: { currentRevisionId: revision.id },
@@ -587,6 +623,7 @@ export class WorkspaceService {
               await encodeMarkdownState(
                 sourceRevision.content,
                 collaborationState.stateFormat,
+                toBlackboardSnapshots(sourceRevision.blackboards),
               ),
             ),
             checkpointRevisionId: revision.id,
@@ -964,10 +1001,21 @@ function integrityError(): ApiError {
 
 async function encodeMarkdownState(
   content: string,
-  stateFormat: 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1',
+  stateFormat: 'LEGACY_TEXT_V1' | 'MILKDOWN_XML_V1' | 'MILKDOWN_BLACKBOARDS_V1',
+  blackboards: BlackboardSnapshot[] = [],
 ): Promise<Uint8Array> {
   if (stateFormat === 'MILKDOWN_XML_V1') {
     return (await getMilkdownCodec()).createState(content);
+  }
+  if (stateFormat === 'MILKDOWN_BLACKBOARDS_V1') {
+    const document = new Y.Doc();
+    try {
+      Y.applyUpdate(document, (await getMilkdownCodec()).createState(content));
+      writeBlackboards(document, blackboards);
+      return Y.encodeStateAsUpdate(document);
+    } finally {
+      document.destroy();
+    }
   }
   const document = new Y.Doc();
   try {
@@ -976,4 +1024,41 @@ async function encodeMarkdownState(
   } finally {
     document.destroy();
   }
+}
+
+function toBlackboardSnapshots(
+  rows: DocumentRevisionBlackboard[],
+): BlackboardSnapshot[] {
+  return blackboardCollectionSchema.parse(
+    rows.map((row) => ({
+      id: row.blackboardId,
+      name: row.name,
+      order: row.sortOrder,
+      backgroundMarkdown: row.backgroundMarkdown,
+      backgroundHash: row.backgroundHash,
+      strokes: JSON.parse(row.drawingPayload) as unknown,
+    })),
+  );
+}
+
+function blackboardRows(revisionId: string, input: BlackboardSnapshot[]) {
+  const blackboards = blackboardCollectionSchema.parse(input);
+  return blackboards.map((blackboard) => {
+    const drawingPayload = JSON.stringify(blackboard.strokes);
+    return {
+      revisionId,
+      blackboardId: blackboard.id,
+      name: blackboard.name,
+      sortOrder: blackboard.order,
+      backgroundMarkdown: blackboard.backgroundMarkdown,
+      backgroundByteSize: Buffer.byteLength(
+        blackboard.backgroundMarkdown,
+        'utf8',
+      ),
+      backgroundHash: blackboard.backgroundHash,
+      drawingPayload,
+      drawingByteSize: Buffer.byteLength(drawingPayload, 'utf8'),
+      drawingHash: createHash('sha256').update(drawingPayload).digest('hex'),
+    };
+  });
 }

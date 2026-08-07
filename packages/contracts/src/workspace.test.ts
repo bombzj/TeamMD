@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  blackboardCollectionSchema,
   collaborationTicketRequestSchema,
   collaborationTicketResponseSchema,
   createDocumentRequestSchema,
@@ -43,6 +44,11 @@ describe('workspace contracts', () => {
         expiresAt: '2026-07-29T00:00:00.000Z',
       }).stateFormat,
     ).toBe('milkdown-xml-v1');
+    expect(
+      collaborationTicketRequestSchema.parse({
+        editorProtocol: 'milkdown-blackboards-v1',
+      }).editorProtocol,
+    ).toBe('milkdown-blackboards-v1');
   });
 
   it('accepts bounded folder and document creation requests', () => {
@@ -245,6 +251,7 @@ describe('workspace contracts', () => {
       revisionContentResponseSchema.parse({
         ...revision,
         content: '# Updated\n',
+        blackboards: [],
       }).content,
     ).toBe('# Updated\n');
     expect(
@@ -256,6 +263,35 @@ describe('workspace contracts', () => {
       baseRevisionId: 'cm1234567890revisioncurrent',
       saveMessage: 'Restore stable version',
     });
+  });
+
+  it('validates bounded blackboard snapshots with immutable Markdown copies', () => {
+    const result = blackboardCollectionSchema.parse([
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Lecture notes',
+        order: 0,
+        backgroundMarkdown: '# Topic\n',
+        backgroundHash:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        strokes: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            tool: 'pen',
+            color: '#112233',
+            width: 4,
+            points: [{ x: 10, y: 20, pressure: 0.5 }],
+          },
+        ],
+      },
+    ]);
+    expect(result[0]?.name).toBe('Lecture notes');
+    expect(() =>
+      blackboardCollectionSchema.parse([
+        result[0],
+        { ...result[0], id: '33333333-3333-4333-8333-333333333333' },
+      ]),
+    ).toThrow();
   });
 
   it('validates public-link tokens and read-only document responses', () => {
