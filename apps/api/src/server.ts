@@ -6,6 +6,7 @@ import { createPrismaClient } from './infrastructure/prisma.js';
 import { CollaborationCheckpointService } from './modules/collaboration/collaboration-checkpoint-service.js';
 import { createCollaborationServer } from './modules/collaboration/collaboration-server.js';
 import { CollaborationService } from './modules/collaboration/collaboration-service.js';
+import { createServerShutdown } from './server-shutdown.js';
 import { WorkspaceService } from './modules/workspace/workspace-service.js';
 
 dotenv.config({ path: '../../.env.local' });
@@ -33,14 +34,21 @@ const app = await buildApp({
   workspaceService,
 });
 
-const close = async (): Promise<void> => {
-  await collaborationServer.destroy();
-  await app.close();
-  await prisma.$disconnect();
+const close = createServerShutdown({
+  closeApi: () => app.close(),
+  closeCollaboration: () => collaborationServer.destroy(),
+  disconnectDatabase: () => prisma.$disconnect(),
+});
+
+const handleSignal = (): void => {
+  void close().catch((error: unknown) => {
+    app.log.error({ error }, 'Server shutdown failed.');
+    process.exitCode = 1;
+  });
 };
 
-process.once('SIGINT', () => void close());
-process.once('SIGTERM', () => void close());
+process.once('SIGINT', handleSignal);
+process.once('SIGTERM', handleSignal);
 
 await app.listen({ host: config.host, port: config.port });
 await collaborationServer.listen(config.collaborationPort);

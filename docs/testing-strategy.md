@@ -108,6 +108,8 @@ Set `TEAMMD_PERFORMANCE_SMOKE=true` and run the focused web/API performance test
 
 Blackboard component regressions repeatedly invoke content resize notifications and assert that intrinsic sheet height stabilizes instead of feeding back into itself. A 100,000-unit logical sheet must remain within the 16,384-pixel per-dimension and 8,388,608-pixel total canvas backing budgets; ordinary stroke redraws must not resize the backing store, and unmount must release it. Store tests cover observer teardown, bounded local undo retention, the 500-stroke limit, and the 6 MiB aggregate collection limit on both browser and server write paths.
 
+Collaboration lifecycle tests keep an idle upgraded WebSocket open while stopping the gateway and require the transport to close. Shutdown coordination tests also require repeated signals to share one cleanup operation and database release to run even when a listener close fails.
+
 On the local Windows/Node 20 validation host, a 265,015-byte Milkdown document mounted in 759 ms; one text transaction plus canonical serialization took 25 ms; observed heap growth was about 13 MiB. The server codec created equivalent Yjs state in 475 ms, emitted a 272,091-byte update, and serialized/hashed the checkpoint projection in 31 ms. A cold representative flowchart rendered in 1,207 ms and a warm 25-node flowchart in 562 ms under deterministic JSDOM SVG measurement. These are smoke observations, not production SLOs, and exclude transport, authorization, database locking, revision writes, and real-browser paint/memory behavior.
 
 ## Rendered Editor Migration Gate

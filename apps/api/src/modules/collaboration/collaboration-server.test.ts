@@ -85,6 +85,27 @@ afterEach(() => {
 });
 
 describe('collaboration gateway', () => {
+  it('releases an idle WebSocket transport during shutdown', async () => {
+    const service = new InMemoryCollaborationService();
+    const server = createCollaborationServer(
+      config,
+      service as unknown as CollaborationService,
+    );
+    await server.listen(0);
+    const socket = new OriginWebSocket(server.webSocketURL);
+
+    try {
+      await waitForWebSocketEvent(socket, 'open');
+      await server.destroy();
+      await waitForWebSocketEvent(socket, 'close');
+
+      expect(socket.readyState).toBe(WebSocket.CLOSED);
+    } finally {
+      socket.terminate();
+      await server.destroy();
+    }
+  });
+
   it('converges writers, rejects viewer updates, and stores the room state', async () => {
     const service = new InMemoryCollaborationService();
     const server = createCollaborationServer(
@@ -265,6 +286,33 @@ flowchart LR
     }
   });
 });
+
+function waitForWebSocketEvent(
+  socket: WebSocket,
+  event: 'open' | 'close',
+): Promise<void> {
+  if (
+    (event === 'open' && socket.readyState === WebSocket.OPEN) ||
+    (event === 'close' && socket.readyState === WebSocket.CLOSED)
+  ) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out waiting for WebSocket ${event}.`)),
+      2_000,
+    );
+    socket.once(event, () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    socket.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
 
 function createProvider(url: string, ticket: string): HocuspocusProvider {
   const websocketProvider = new HocuspocusProviderWebsocket({
