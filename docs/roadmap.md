@@ -87,7 +87,7 @@ Real-time work must not weaken explicit snapshots, auditability, revocation, or 
 
 ## Phase 8: Document Blackboard Mode
 
-In progress. The negotiated state format, immutable revision storage, frozen-background validation, multi-board drawing UI, reorder, individual and lasso group selection/move, pressure-aware ink, line/rectangle/ellipse/arrow gestures, client-local Yjs Undo/Redo, per-board zoom and drag-panning, checkpoint/restore path, and focused contract/API/web tests are implemented. Broader real-device mouse/touch/stylus and visual coverage, performance budgets, and rollout gates remain.
+In progress. The negotiated state format, immutable revision storage, frozen-background validation, multi-board drawing UI, reorder, individual and lasso group selection/move, pressure-aware ink, line/rectangle/ellipse/arrow gestures, client-local Yjs Undo/Redo, per-board zoom and drag-panning, checkpoint/restore path, and focused contract/API/web tests are implemented. Idle resize feedback, canvas reallocation, oversized backing buffers, unbounded local undo retention, observer cleanup, aggregate client/server collection limits, and large dirty-state serialization have been hardened. Broader real-device mouse/touch/stylus and visual coverage and rollout gates remain.
 
 - Finalize the classroom-oriented interaction model with multiple named blackboards, each using a fixed, viewport-independent logical sheet over its own read-only Markdown copy captured at creation.
 - Add a versioned, bounded blackboard collection and independent vector-stroke layers to the authenticated document Yjs room without creating another Markdown document or changing canonical Markdown.

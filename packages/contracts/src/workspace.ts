@@ -10,6 +10,7 @@ const maximumMarkdownBytes = 2 * 1024 * 1024;
 export const maximumBlackboardsPerDocument = 12;
 export const maximumBlackboardStrokes = 500;
 export const maximumBlackboardPointsPerStroke = 2_048;
+export const maximumBlackboardCollectionBytes = 6 * 1024 * 1024;
 const maximumBlackboardNameLength = 80;
 const workspaceNameSchema = z
   .string()

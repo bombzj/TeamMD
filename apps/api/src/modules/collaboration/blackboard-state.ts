@@ -1,5 +1,6 @@
 import {
   blackboardCollectionSchema,
+  maximumBlackboardCollectionBytes,
   type BlackboardSnapshot,
 } from '@teammd/contracts';
 import { createHash } from 'node:crypto';
@@ -8,8 +9,6 @@ import * as Y from 'yjs';
 import { ApiError } from '../../lib/api-error.js';
 
 export const blackboardRootName = 'blackboards';
-const maximumBlackboardCollectionBytes = 6 * 1024 * 1024;
-
 export function readBlackboards(document: Y.Doc): BlackboardSnapshot[] {
   const root = document.getMap<unknown>(blackboardRootName);
   const blackboards: BlackboardSnapshot[] = [];
@@ -46,16 +45,7 @@ export function readBlackboards(document: Y.Doc): BlackboardSnapshot[] {
       throw invalidBlackboardState();
     }
   }
-  if (
-    Buffer.byteLength(JSON.stringify(canonical), 'utf8') >
-    maximumBlackboardCollectionBytes
-  ) {
-    throw new ApiError(
-      413,
-      'VALIDATION_ERROR',
-      'The blackboard collection is too large.',
-    );
-  }
+  ensureCollectionSize(canonical);
   return canonical;
 }
 
@@ -66,6 +56,7 @@ export function writeBlackboards(
   const blackboards = canonicalizeBlackboards(
     blackboardCollectionSchema.parse(input),
   );
+  ensureCollectionSize(blackboards);
   const root = document.getMap<Y.Map<unknown>>(blackboardRootName);
   document.transact(() => {
     for (const id of [...root.keys()]) root.delete(id);
@@ -153,4 +144,18 @@ function invalidBlackboardState(
   message = 'The collaborative blackboard state is invalid.',
 ): ApiError {
   return new ApiError(400, 'VALIDATION_ERROR', message);
+}
+
+function ensureCollectionSize(blackboards: BlackboardSnapshot[]): void {
+  if (
+    Buffer.byteLength(JSON.stringify(blackboards), 'utf8') <=
+    maximumBlackboardCollectionBytes
+  ) {
+    return;
+  }
+  throw new ApiError(
+    413,
+    'VALIDATION_ERROR',
+    'The blackboard collection is too large.',
+  );
 }

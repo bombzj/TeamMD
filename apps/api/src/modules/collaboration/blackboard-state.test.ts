@@ -63,4 +63,27 @@ describe('blackboard Yjs state', () => {
     candidate.destroy();
     changed.destroy();
   });
+
+  it('rejects an oversized collection before allocating Yjs board state', () => {
+    const document = new Y.Doc();
+    const largeMarkdown = 'x'.repeat(2 * 1024 * 1024);
+    const largeHash = createHash('sha256').update(largeMarkdown).digest('hex');
+    expect(() =>
+      writeBlackboards(
+        document,
+        Array.from({ length: 3 }, (_, index) => ({
+          ...board,
+          id: `${index.toString().padStart(8, '0')}-0000-4000-8000-${index
+            .toString()
+            .padStart(12, '0')}`,
+          name: `Large ${index}`,
+          order: index,
+          backgroundMarkdown: largeMarkdown,
+          backgroundHash: largeHash,
+          strokes: [],
+        })),
+      ),
+    ).toThrow('too large');
+    document.destroy();
+  });
 });

@@ -6,7 +6,7 @@ Add OneNote-like blackboard mode to each Markdown document. A document can own m
 
 ## Current Implementation Status
 
-In progress. `MILKDOWN_BLACKBOARDS_V1`, the reviewed Prisma migration, shared Zod limits, server transition validation, immutable revision snapshots, atomic checkpoint/restore integration, multiple board tabs, frozen Markdown rendering, pressure-aware pen/highlighter/stroke eraser, line/rectangle/ellipse/arrow gestures, rename/reorder/clear/delete, single and lasso group selection/move/keyboard deletion, client-local Yjs Undo/Redo, per-board zoom and drag-panning, and authorized history rendering are implemented. Full real-device mouse/touch/stylus and visual coverage, performance budgets, feature gating, and rollout remain.
+In progress. `MILKDOWN_BLACKBOARDS_V1`, the reviewed Prisma migration, shared Zod limits, server transition validation, immutable revision snapshots, atomic checkpoint/restore integration, multiple board tabs, frozen Markdown rendering, pressure-aware pen/highlighter/stroke eraser, line/rectangle/ellipse/arrow gestures, rename/reorder/clear/delete, single and lasso group selection/move/keyboard deletion, client-local Yjs Undo/Redo, per-board zoom and drag-panning, and authorized history rendering are implemented. Memory hardening now includes intrinsic-height measurement without resize feedback, bounded canvas backing allocation, redraws without buffer reallocation, animation-frame-coalesced pointer previews, explicit unmount/observer cleanup, bounded Undo retention, allocation-free dirty comparison, and matching client/server collection limits. Full real-device mouse/touch/stylus and visual coverage, feature gating, and broader rollout measurement remain.
 
 ## OneNote Gap Boundary
 
@@ -56,6 +56,7 @@ The dirty indicator is the union of unsaved Markdown, blackboard metadata, and d
 - Reject viewer-originated drawing mutations server-side and disconnect rooms after access changes.
 - Validate copied Markdown, names, finite coordinates, and enums and enforce limits per blackboard and per document for board count, background bytes, logical extent, strokes, points per stroke, total points, style precision, Yjs update size, compacted room size, and aggregate immutable snapshot size.
 - Bound render work and memory for current and historical blackboards; virtualize or simplify display only when it does not change saved geometry.
+- Measure only intrinsic background content, never a sheet element whose own height is the measurement output. Cap native canvas pixels independently from the logical coordinate extent and release backing storage when a surface unmounts.
 - Do not store raw pointer telemetry, pressure-device identifiers, drawing payloads, or Markdown in logs or analytics.
 - Render with application-owned canvas/SVG primitives. Do not accept arbitrary SVG, HTML, scripts, data URLs, or external resources as stroke data.
 

@@ -55,7 +55,7 @@ import {
 } from './collaborative-editor.js';
 import { MarkdownPreview } from './MarkdownPreview.js';
 import { BlackboardPanel } from './BlackboardPanel.js';
-import { hashBlackboards, serializeBlackboards } from './blackboard-state.js';
+import { blackboardsEqual, hashBlackboards } from './blackboard-state.js';
 import { createStandaloneEditor } from './standalone-editor.js';
 
 type DocumentEditorProps = {
@@ -70,7 +70,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
   const restoringEditorRef = useRef(false);
   const savedContentRef = useRef('');
   const blackboardsRef = useRef<BlackboardSnapshot[]>([]);
-  const savedBlackboardsRef = useRef('[]');
+  const savedBlackboardsRef = useRef<BlackboardSnapshot[]>([]);
   const standaloneBaseRevisionIdRef = useRef<string | null>(null);
   const initialDocumentRef = useRef<DocumentContentResponse | null>(null);
   const initialDocumentIdRef = useRef(documentId);
@@ -127,13 +127,14 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
       (await hashBlackboards(currentBlackboards)) === checkpoint.blackboardHash;
     if (contentMatches && blackboardsMatch) {
       savedContentRef.current = savedContent;
-      savedBlackboardsRef.current = serializeBlackboards(
-        acknowledgedBlackboards ?? currentBlackboards,
-      );
+      savedBlackboardsRef.current =
+        acknowledgedBlackboards ?? currentBlackboards;
       setDirty(
         editorRef.current?.getContent() !== savedContent ||
-          serializeBlackboards(editorRef.current?.getBlackboards?.() ?? []) !==
+          !blackboardsEqual(
+            editorRef.current?.getBlackboards?.() ?? [],
             savedBlackboardsRef.current,
+          ),
       );
       queryClient.setQueryData<DocumentContentResponse>(
         ['documents', documentId],
@@ -248,7 +249,7 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
 
     savedContentRef.current = initial.content;
     blackboardsRef.current = [];
-    savedBlackboardsRef.current = '[]';
+    savedBlackboardsRef.current = [];
     setContent(initial.content);
     setBlackboards([]);
     setActiveBlackboardId(null);
@@ -290,16 +291,20 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
           restoringEditorRef.current = false;
           savedContentRef.current = nextContent;
           setDirty(
-            serializeBlackboards(blackboardsRef.current) !==
+            !blackboardsEqual(
+              blackboardsRef.current,
               savedBlackboardsRef.current,
+            ),
           );
           setNotice('Saved');
           return;
         }
         setDirty(
           nextContent !== savedContentRef.current ||
-            serializeBlackboards(blackboardsRef.current) !==
+            !blackboardsEqual(
+              blackboardsRef.current,
               savedBlackboardsRef.current,
+            ),
         );
         setNotice(null);
       },
@@ -313,18 +318,17 @@ export function DocumentEditor({ documentId, onClose }: DocumentEditorProps) {
             ? current
             : (nextBlackboards[0]?.id ?? null),
         );
-        const serialized = serializeBlackboards(nextBlackboards);
         if (
-          savedBlackboardsRef.current === '[]' &&
+          savedBlackboardsRef.current.length === 0 &&
           nextBlackboards.length > 0 &&
           !receivedAuthoritativeContent
         ) {
-          savedBlackboardsRef.current = serialized;
+          savedBlackboardsRef.current = nextBlackboards;
         }
         setDirty(
           (editorRef.current?.getContent() ?? initial.content) !==
             savedContentRef.current ||
-            serialized !== savedBlackboardsRef.current,
+            !blackboardsEqual(nextBlackboards, savedBlackboardsRef.current),
         );
         setNotice(null);
       },

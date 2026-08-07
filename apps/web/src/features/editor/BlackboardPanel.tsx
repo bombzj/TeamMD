@@ -1,7 +1,8 @@
-import type {
-  BlackboardPoint,
-  BlackboardSnapshot,
-  BlackboardStroke,
+import {
+  maximumBlackboardPointsPerStroke,
+  type BlackboardPoint,
+  type BlackboardSnapshot,
+  type BlackboardStroke,
 } from '@teammd/contracts';
 import {
   ChevronLeft,
@@ -34,6 +35,20 @@ import {
 } from 'react';
 
 import { MarkdownPreview } from './MarkdownPreview.js';
+
+/*
+ * Keep canvas allocation independent from document height. A tall frozen
+ * Markdown page is allowed to use a lower backing resolution, but it must not
+ * allocate an unbounded RGBA buffer.
+ */
+const blackboardWidth = 900;
+const minimumBlackboardHeight = 720;
+const maximumBlackboardHeight = 100_000;
+const blackboardVerticalPadding = 46 + 80;
+const maximumCanvasBackingDimension = 16_384;
+const maximumCanvasBackingPixels = 8 * 1024 * 1024;
+const maximumCanvasPixelRatio = 2;
+const minimumSampleDistance = 0.75;
 
 type DrawingTool =
   | 'pen'
@@ -467,8 +482,10 @@ function BlackboardSurface({
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const backgroundRef = useRef<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState(720);
+  const backgroundContentRef = useRef<HTMLDivElement | null>(null);
+  const canvasScaleRef = useRef(1);
+  const transientFrameRef = useRef<number | null>(null);
+  const [height, setHeight] = useState(minimumBlackboardHeight);
   const [draft, setDraft] = useState<BlackboardStroke | null>(null);
   const draftRef = useRef<BlackboardStroke | null>(null);
   const gestureStartRef = useRef<BlackboardPoint | null>(null);
@@ -478,6 +495,20 @@ function BlackboardSurface({
   const [selectedStrokeIds, setSelectedStrokeIds] = useState<string[]>([]);
   const [move, setMove] = useState<StrokeMove | null>(null);
   const moveRef = useRef<StrokeMove | null>(null);
+  const scheduleTransientRender = () => {
+    if (transientFrameRef.current !== null) return;
+    transientFrameRef.current = window.requestAnimationFrame(() => {
+      transientFrameRef.current = null;
+      setDraft(draftRef.current);
+      setLasso(lassoRef.current);
+      setMove(moveRef.current);
+    });
+  };
+  const cancelTransientRender = () => {
+    if (transientFrameRef.current === null) return;
+    window.cancelAnimationFrame(transientFrameRef.current);
+    transientFrameRef.current = null;
+  };
   const strokes = useMemo(() => {
     let visible = blackboard.strokes;
     if (move !== null) {
@@ -492,6 +523,10 @@ function BlackboardSurface({
   }, [blackboard.strokes, draft, move]);
 
   useEffect(() => {
+    if (transientFrameRef.current !== null) {
+      window.cancelAnimationFrame(transientFrameRef.current);
+      transientFrameRef.current = null;
+    }
     setSelectedStrokeIds([]);
     setDraft(null);
     draftRef.current = null;
@@ -513,26 +548,60 @@ function BlackboardSurface({
   }, [blackboard.strokes]);
 
   useLayoutEffect(() => {
-    const background = backgroundRef.current;
-    if (background === null) return;
-    const update = () =>
-      setHeight(Math.min(100_000, Math.max(720, background.scrollHeight + 64)));
-    const observer = new ResizeObserver(update);
-    observer.observe(background);
-    update();
-    return () => observer.disconnect();
+    const content = backgroundContentRef.current;
+    if (content === null) return;
+    let measurementFrame: number | null = null;
+    const measure = () => {
+      measurementFrame = null;
+      const nextHeight = Math.min(
+        maximumBlackboardHeight,
+        Math.max(
+          minimumBlackboardHeight,
+          Math.ceil(content.scrollHeight + blackboardVerticalPadding),
+        ),
+      );
+      setHeight((current) => (current === nextHeight ? current : nextHeight));
+    };
+    const scheduleMeasurement = () => {
+      if (measurementFrame !== null) return;
+      measurementFrame = window.requestAnimationFrame(measure);
+    };
+    const observer = new ResizeObserver(scheduleMeasurement);
+    observer.observe(content);
+    scheduleMeasurement();
+    return () => {
+      observer.disconnect();
+      if (measurementFrame !== null) {
+        window.cancelAnimationFrame(measurementFrame);
+      }
+    };
   }, [blackboard.id, blackboard.backgroundMarkdown]);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+    const requestedRatio = canvasBackingRatio(height, window.devicePixelRatio);
+    const backingWidth = Math.max(
+      1,
+      Math.floor(blackboardWidth * requestedRatio),
+    );
+    const backingHeight = Math.max(1, Math.floor(height * requestedRatio));
+    canvasScaleRef.current = Math.min(
+      backingWidth / blackboardWidth,
+      backingHeight / height,
+    );
+    canvas.width = backingWidth;
+    canvas.height = backingHeight;
+  }, [height]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.round(900 * ratio);
-    canvas.height = Math.round(height * ratio);
     const context = canvas.getContext('2d');
     if (context === null) return;
+    const ratio = canvasScaleRef.current;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, 900, height);
+    context.clearRect(0, 0, blackboardWidth, height);
     for (const stroke of strokes) drawStroke(context, stroke);
     const selectedIds = new Set(selectedStrokeIds);
     for (const stroke of strokes) {
@@ -541,13 +610,30 @@ function BlackboardSurface({
     if (lasso.length > 0) drawLasso(context, lasso);
   }, [height, lasso, selectedStrokeIds, strokes]);
 
+  useEffect(() => {
+    const mountedCanvas = canvasRef.current;
+    return () => {
+      if (transientFrameRef.current !== null) {
+        window.cancelAnimationFrame(transientFrameRef.current);
+        transientFrameRef.current = null;
+      }
+      if (mountedCanvas !== null) {
+        // Release the browser's native backing store immediately on unmount.
+        mountedCanvas.width = 1;
+        mountedCanvas.height = 1;
+      }
+    };
+  }, []);
+
   const pointFor = (
     event: ReactPointerEvent<HTMLCanvasElement>,
   ): BlackboardPoint => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return {
-      x: ((event.clientX - bounds.left) / bounds.width) * 900,
-      y: ((event.clientY - bounds.top) / bounds.height) * height,
+      x:
+        ((event.clientX - bounds.left) / Math.max(1, bounds.width)) *
+        blackboardWidth,
+      y: ((event.clientY - bounds.top) / Math.max(1, bounds.height)) * height,
       pressure: event.pressure > 0 ? event.pressure : 0.5,
     };
   };
@@ -637,14 +723,22 @@ function BlackboardSurface({
     <div ref={scrollRef} className="blackboard-scroll">
       <div
         className="blackboard-sheet-frame"
-        style={{ height: height * zoom, width: 900 * zoom }}
+        style={{
+          height: height * zoom,
+          width: blackboardWidth * zoom,
+        }}
       >
         <div
           className="blackboard-sheet"
           style={{ height, transform: `scale(${zoom})` }}
         >
-          <div ref={backgroundRef} className="blackboard-background">
-            <MarkdownPreview content={blackboard.backgroundMarkdown} />
+          <div className="blackboard-background">
+            <div
+              ref={backgroundContentRef}
+              className="blackboard-background-content"
+            >
+              <MarkdownPreview content={blackboard.backgroundMarkdown} />
+            </div>
           </div>
           <canvas
             ref={canvasRef}
@@ -668,9 +762,10 @@ function BlackboardSurface({
               }
               const point = pointFor(event);
               if (lassoRef.current.length > 0) {
-                const nextLasso = [...lassoRef.current, point].slice(-2_048);
+                const nextLasso = appendSample(lassoRef.current, point);
+                if (nextLasso === lassoRef.current) return;
                 lassoRef.current = nextLasso;
-                setLasso(nextLasso);
+                scheduleTransientRender();
                 return;
               }
               if (moveRef.current !== null) {
@@ -683,7 +778,7 @@ function BlackboardSurface({
                 );
                 const nextMove = { ...current, deltaX, deltaY };
                 moveRef.current = nextMove;
-                setMove(nextMove);
+                scheduleTransientRender();
                 return;
               }
               if (draftRef.current === null) return;
@@ -697,17 +792,20 @@ function BlackboardSurface({
                   point,
                 );
                 draftRef.current = nextDraft;
-                setDraft(nextDraft);
+                scheduleTransientRender();
                 return;
               }
+              const nextPoints = appendSample(draftRef.current.points, point);
+              if (nextPoints === draftRef.current.points) return;
               const nextDraft = {
                 ...draftRef.current,
-                points: [...draftRef.current.points, point].slice(-2_048),
+                points: nextPoints,
               };
               draftRef.current = nextDraft;
-              setDraft(nextDraft);
+              scheduleTransientRender();
             }}
             onPointerUp={(event) => {
+              cancelTransientRender();
               if (panRef.current !== null) {
                 panRef.current = null;
               }
@@ -748,6 +846,7 @@ function BlackboardSurface({
               }
             }}
             onPointerCancel={() => {
+              cancelTransientRender();
               panRef.current = null;
               lassoRef.current = [];
               setLasso([]);
@@ -849,13 +948,22 @@ function drawSelection(
   context: CanvasRenderingContext2D,
   stroke: BlackboardStroke,
 ) {
-  const xs = stroke.points.map((point) => point.x);
-  const ys = stroke.points.map((point) => point.y);
+  let minimumX = Number.POSITIVE_INFINITY;
+  let maximumX = Number.NEGATIVE_INFINITY;
+  let minimumY = Number.POSITIVE_INFINITY;
+  let maximumY = Number.NEGATIVE_INFINITY;
+  for (const point of stroke.points) {
+    minimumX = Math.min(minimumX, point.x);
+    maximumX = Math.max(maximumX, point.x);
+    minimumY = Math.min(minimumY, point.y);
+    maximumY = Math.max(maximumY, point.y);
+  }
+  if (!Number.isFinite(minimumX) || !Number.isFinite(minimumY)) return;
   const padding = Math.max(8, stroke.width);
-  const left = Math.min(...xs) - padding;
-  const top = Math.min(...ys) - padding;
-  const width = Math.max(...xs) - Math.min(...xs) + padding * 2;
-  const height = Math.max(...ys) - Math.min(...ys) + padding * 2;
+  const left = minimumX - padding;
+  const top = minimumY - padding;
+  const width = maximumX - minimumX + padding * 2;
+  const height = maximumY - minimumY + padding * 2;
   context.save();
   context.strokeStyle = '#315f89';
   context.lineWidth = 1.5;
@@ -885,13 +993,22 @@ function boundedMovement(
   deltaY: number,
   sheetHeight: number,
 ): [number, number] {
-  const points = strokes.flatMap((stroke) => stroke.points);
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  if (xs.length === 0 || ys.length === 0) return [0, 0];
+  let minimumX = Number.POSITIVE_INFINITY;
+  let maximumX = Number.NEGATIVE_INFINITY;
+  let minimumY = Number.POSITIVE_INFINITY;
+  let maximumY = Number.NEGATIVE_INFINITY;
+  for (const stroke of strokes) {
+    for (const point of stroke.points) {
+      minimumX = Math.min(minimumX, point.x);
+      maximumX = Math.max(maximumX, point.x);
+      minimumY = Math.min(minimumY, point.y);
+      maximumY = Math.max(maximumY, point.y);
+    }
+  }
+  if (!Number.isFinite(minimumX) || !Number.isFinite(minimumY)) return [0, 0];
   return [
-    Math.max(-Math.min(...xs), Math.min(deltaX, 900 - Math.max(...xs))),
-    Math.max(-Math.min(...ys), Math.min(deltaY, sheetHeight - Math.max(...ys))),
+    Math.max(-minimumX, Math.min(deltaX, blackboardWidth - maximumX)),
+    Math.max(-minimumY, Math.min(deltaY, sheetHeight - maximumY)),
   ];
 }
 
@@ -1040,5 +1157,38 @@ function distanceToSegment(
   return Math.hypot(
     point.x - (start.x + position * deltaX),
     point.y - (start.y + position * deltaY),
+  );
+}
+
+function appendSample(
+  points: BlackboardPoint[],
+  point: BlackboardPoint,
+): BlackboardPoint[] {
+  if (points.length >= maximumBlackboardPointsPerStroke) return points;
+  const previous = points.at(-1);
+  if (
+    previous !== undefined &&
+    Math.hypot(point.x - previous.x, point.y - previous.y) <
+      minimumSampleDistance
+  ) {
+    return points;
+  }
+  return [...points, point];
+}
+
+function canvasBackingRatio(height: number, devicePixelRatio: number): number {
+  const requestedRatio =
+    Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+      ? Math.min(devicePixelRatio, maximumCanvasPixelRatio)
+      : 1;
+  const pixelLimitedRatio = Math.sqrt(
+    maximumCanvasBackingPixels / (blackboardWidth * Math.max(1, height)),
+  );
+  const dimensionLimitedRatio =
+    maximumCanvasBackingDimension /
+    Math.max(blackboardWidth, Math.max(1, height));
+  return Math.max(
+    Number.EPSILON,
+    Math.min(requestedRatio, pixelLimitedRatio, dimensionLimitedRatio),
   );
 }

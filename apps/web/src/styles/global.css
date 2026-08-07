@@ -1415,6 +1415,9 @@ body.editor-full-screen-open {
   padding: 46px 58px 80px;
   pointer-events: none;
 }
+.blackboard-background-content {
+  min-width: 0;
+}
 .blackboard-drawing {
   position: absolute;
   inset: 0;

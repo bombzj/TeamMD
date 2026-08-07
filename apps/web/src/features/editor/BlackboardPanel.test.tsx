@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,10 +35,16 @@ const blackboard = {
   ],
 };
 
+let resizeCallbacks: ResizeObserverCallback[] = [];
+
 beforeEach(() => {
+  resizeCallbacks = [];
   vi.stubGlobal(
     'ResizeObserver',
     class {
+      public constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(callback);
+      }
       public observe() {}
       public disconnect() {}
     },
@@ -272,7 +285,133 @@ describe('BlackboardPanel', () => {
     expect(scroll.scrollLeft).toBe(70);
     expect(scroll.scrollTop).toBe(60);
   });
+
+  it('measures intrinsic Markdown once without an idle height feedback loop', async () => {
+    const view = renderPanel();
+    const content = document.querySelector('.blackboard-background-content');
+    const frame = document.querySelector('.blackboard-sheet-frame');
+    expect(content).toBeInstanceOf(HTMLDivElement);
+    expect(frame).toBeInstanceOf(HTMLDivElement);
+    if (!(content instanceof HTMLDivElement)) return;
+    if (!(frame instanceof HTMLDivElement)) return;
+    Object.defineProperty(content, 'scrollHeight', {
+      configurable: true,
+      get: () => 1_000,
+    });
+
+    act(() => {
+      for (let index = 0; index < 50; index += 1) {
+        resizeCallbacks.forEach((callback) =>
+          callback([], {} as ResizeObserver),
+        );
+      }
+    });
+    await waitFor(() => expect(frame.style.height).toBe('1126px'));
+
+    act(() => {
+      for (let index = 0; index < 50; index += 1) {
+        resizeCallbacks.forEach((callback) =>
+          callback([], {} as ResizeObserver),
+        );
+      }
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    expect(frame.style.height).toBe('1126px');
+    view.unmount();
+  });
+
+  it('bounds tall-page canvas memory and releases its backing store on unmount', async () => {
+    const view = renderPanel();
+    const content = document.querySelector('.blackboard-background-content');
+    const canvas = screen.getByLabelText('Board 1 drawing surface');
+    expect(content).toBeInstanceOf(HTMLDivElement);
+    expect(canvas).toBeInstanceOf(HTMLCanvasElement);
+    if (!(content instanceof HTMLDivElement)) return;
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    Object.defineProperty(content, 'scrollHeight', {
+      configurable: true,
+      get: () => 99_874,
+    });
+    act(() => {
+      resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver));
+    });
+    await waitFor(() => expect(canvas.height).toBeGreaterThan(720));
+    expect(canvas.height).toBeLessThanOrEqual(16_384);
+    expect(canvas.width * canvas.height).toBeLessThanOrEqual(8 * 1024 * 1024);
+
+    view.unmount();
+    expect(canvas.width).toBe(1);
+    expect(canvas.height).toBe(1);
+  });
+
+  it('does not reallocate the canvas backing store for an ordinary redraw', () => {
+    const view = renderPanel();
+    const canvas = screen.getByLabelText('Board 1 drawing surface');
+    expect(canvas).toBeInstanceOf(HTMLCanvasElement);
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    let width = canvas.width;
+    let height = canvas.height;
+    let allocations = 0;
+    Object.defineProperties(canvas, {
+      width: {
+        configurable: true,
+        get: () => width,
+        set: (value: number) => {
+          allocations += 1;
+          width = value;
+        },
+      },
+      height: {
+        configurable: true,
+        get: () => height,
+        set: (value: number) => {
+          allocations += 1;
+          height = value;
+        },
+      },
+    });
+
+    view.rerender(
+      blackboardPanel({
+        ...blackboard,
+        strokes: [
+          ...blackboard.strokes,
+          {
+            ...blackboard.strokes[0]!,
+            id: '77777777-7777-4777-8777-777777777777',
+          },
+        ],
+      }),
+    );
+    expect(allocations).toBe(0);
+  });
 });
+
+function renderPanel() {
+  return render(blackboardPanel(blackboard));
+}
+
+function blackboardPanel(value: typeof blackboard) {
+  return (
+    <BlackboardPanel
+      activeBlackboardId={value.id}
+      blackboards={[value]}
+      currentMarkdown="# Current\n"
+      readOnly={false}
+      onAddStroke={vi.fn()}
+      onClear={vi.fn()}
+      onCreate={vi.fn()}
+      onDelete={vi.fn()}
+      onDeleteStrokes={vi.fn()}
+      onMoveStrokes={vi.fn()}
+      onRedo={vi.fn()}
+      onRename={vi.fn()}
+      onReorder={vi.fn()}
+      onSelect={vi.fn()}
+      onUndo={vi.fn()}
+    />
+  );
+}
 
 function configureCanvas(canvas: HTMLElement) {
   Object.defineProperties(canvas, {

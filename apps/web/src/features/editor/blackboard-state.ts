@@ -1,12 +1,16 @@
 import {
   blackboardCollectionSchema,
+  maximumBlackboardCollectionBytes,
   maximumBlackboardsPerDocument,
+  maximumBlackboardStrokes,
   type BlackboardSnapshot,
   type BlackboardStroke,
 } from '@teammd/contracts';
 import * as Y from 'yjs';
 
 const rootName = 'blackboards';
+const maximumUndoSteps = 100;
+const encoder = new TextEncoder();
 
 export type BlackboardStore = {
   addStroke: (blackboardId: string, stroke: BlackboardStroke) => void;
@@ -48,9 +52,23 @@ export function createBlackboardStore(
     captureTimeout: 0,
     trackedOrigins: new Set([localOrigin]),
   });
-  const transact = (operation: () => void) =>
+  let destroyed = false;
+  const observers = new Set<() => void>();
+  const ensureActive = () => {
+    if (destroyed) throw new Error('The blackboard has been closed.');
+  };
+  const transact = (operation: () => void) => {
+    ensureActive();
+    if (undoManager.undoStack.length >= maximumUndoSteps) {
+      // Yjs retains deleted structs while they remain undoable. Clearing at a
+      // bounded interval releases those references instead of letting a long
+      // classroom session grow without limit.
+      undoManager.clear();
+    }
     document.transact(operation, localOrigin);
+  };
   const ensureEditable = () => {
+    ensureActive();
     if (!canEdit()) throw new Error('This blackboard is read only.');
   };
   const requireBoard = (blackboardId: string) => {
@@ -97,6 +115,17 @@ export function createBlackboardStore(
         })),
       });
     });
+    ensureCollectionWithinLimit(
+      replaceBoard(readBlackboards(root), blackboardId, (blackboard) => {
+        const movedById = new Map(moved.map((stroke) => [stroke.id, stroke]));
+        return {
+          ...blackboard,
+          strokes: blackboard.strokes.map(
+            (stroke) => movedById.get(stroke.id) ?? stroke,
+          ),
+        };
+      }),
+    );
     transact(() => {
       for (const stroke of moved) {
         strokes.set(stroke.id, JSON.stringify(stroke));
@@ -105,12 +134,20 @@ export function createBlackboardStore(
   };
 
   return {
-    list: () => readBlackboards(root),
+    list: () => {
+      ensureActive();
+      return readBlackboards(root);
+    },
     subscribe: (listener) => {
+      ensureActive();
       const publish = () => listener(readBlackboards(root));
+      observers.add(publish);
       root.observeDeep(publish);
       publish();
-      return () => root.unobserveDeep(publish);
+      return () => {
+        if (!observers.delete(publish)) return;
+        root.unobserveDeep(publish);
+      };
     },
     create: async (name, backgroundMarkdown) => {
       ensureEditable();
@@ -132,9 +169,36 @@ export function createBlackboardStore(
       }
       const id = crypto.randomUUID();
       const backgroundHash = await sha256(backgroundMarkdown);
+      ensureEditable();
+      const current = readBlackboards(root);
+      if (current.length >= maximumBlackboardsPerDocument) {
+        throw new Error(
+          'This document already has the maximum number of blackboards.',
+        );
+      }
+      if (
+        current.some(
+          (blackboard) =>
+            blackboard.name.toLocaleLowerCase('en-US') ===
+            normalizedName.toLocaleLowerCase('en-US'),
+        )
+      ) {
+        throw new Error('A blackboard with that name already exists.');
+      }
+      ensureCollectionWithinLimit([
+        ...current,
+        {
+          id,
+          name: normalizedName,
+          order: current.length,
+          backgroundMarkdown,
+          backgroundHash,
+          strokes: [],
+        },
+      ]);
       const board = new Y.Map<unknown>();
       board.set('name', normalizedName);
-      board.set('order', existing.length);
+      board.set('order', current.length);
       board.set('backgroundMarkdown', backgroundMarkdown);
       board.set('backgroundHash', backgroundHash);
       board.set('strokes', new Y.Map<string>());
@@ -155,6 +219,12 @@ export function createBlackboardStore(
       ) {
         throw new Error('A blackboard with that name already exists.');
       }
+      ensureCollectionWithinLimit(
+        replaceBoard(existing, blackboardId, (blackboard) => ({
+          ...blackboard,
+          name: normalizedName,
+        })),
+      );
       transact(() => requireBoard(blackboardId).set('name', normalizedName));
     },
     reorder: (blackboardId, targetIndex) => {
@@ -190,6 +260,27 @@ export function createBlackboardStore(
       ensureEditable();
       const parsed =
         blackboardCollectionSchema.element.shape.strokes.element.parse(stroke);
+      const existing = readBlackboards(root);
+      const board = existing.find(
+        (blackboard) => blackboard.id === blackboardId,
+      );
+      if (board === undefined) throw new Error('Blackboard not found.');
+      const isReplacement = board.strokes.some(
+        (candidate) => candidate.id === parsed.id,
+      );
+      if (!isReplacement && board.strokes.length >= maximumBlackboardStrokes) {
+        throw new Error('This blackboard has reached its stroke limit.');
+      }
+      ensureCollectionWithinLimit(
+        replaceBoard(existing, blackboardId, (blackboard) => ({
+          ...blackboard,
+          strokes: isReplacement
+            ? blackboard.strokes.map((candidate) =>
+                candidate.id === parsed.id ? parsed : candidate,
+              )
+            : [...blackboard.strokes, parsed],
+        })),
+      );
       transact(() =>
         requireStrokes(requireBoard(blackboardId)).set(
           parsed.id,
@@ -217,7 +308,14 @@ export function createBlackboardStore(
       undoManager.redo();
       return true;
     },
-    destroy: () => undoManager.destroy(),
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const publish of observers) root.unobserveDeep(publish);
+      observers.clear();
+      undoManager.clear();
+      undoManager.destroy();
+    },
   };
 }
 
@@ -233,6 +331,53 @@ export async function hashBlackboards(
   blackboards: BlackboardSnapshot[],
 ): Promise<string> {
   return sha256(serializeBlackboards(blackboards));
+}
+
+export function blackboardsEqual(
+  left: BlackboardSnapshot[],
+  right: BlackboardSnapshot[],
+): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (const [boardIndex, leftBoard] of left.entries()) {
+    const rightBoard = right[boardIndex];
+    if (
+      rightBoard === undefined ||
+      leftBoard.id !== rightBoard.id ||
+      leftBoard.name !== rightBoard.name ||
+      leftBoard.order !== rightBoard.order ||
+      leftBoard.backgroundHash !== rightBoard.backgroundHash ||
+      leftBoard.backgroundMarkdown !== rightBoard.backgroundMarkdown ||
+      leftBoard.strokes.length !== rightBoard.strokes.length
+    ) {
+      return false;
+    }
+    for (const [strokeIndex, leftStroke] of leftBoard.strokes.entries()) {
+      const rightStroke = rightBoard.strokes[strokeIndex];
+      if (
+        rightStroke === undefined ||
+        leftStroke.id !== rightStroke.id ||
+        leftStroke.tool !== rightStroke.tool ||
+        leftStroke.color !== rightStroke.color ||
+        leftStroke.width !== rightStroke.width ||
+        leftStroke.points.length !== rightStroke.points.length
+      ) {
+        return false;
+      }
+      for (const [pointIndex, leftPoint] of leftStroke.points.entries()) {
+        const rightPoint = rightStroke.points[pointIndex];
+        if (
+          rightPoint === undefined ||
+          leftPoint.x !== rightPoint.x ||
+          leftPoint.y !== rightPoint.y ||
+          leftPoint.pressure !== rightPoint.pressure
+        ) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 function readBlackboards(root: Y.Map<Y.Map<unknown>>): BlackboardSnapshot[] {
@@ -293,4 +438,28 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
+}
+
+function replaceBoard(
+  blackboards: BlackboardSnapshot[],
+  blackboardId: string,
+  update: (blackboard: BlackboardSnapshot) => BlackboardSnapshot,
+): BlackboardSnapshot[] {
+  let found = false;
+  const next = blackboards.map((blackboard) => {
+    if (blackboard.id !== blackboardId) return blackboard;
+    found = true;
+    return update(blackboard);
+  });
+  if (!found) throw new Error('Blackboard not found.');
+  return next;
+}
+
+function ensureCollectionWithinLimit(blackboards: BlackboardSnapshot[]): void {
+  const serialized = serializeBlackboards(blackboards);
+  if (
+    encoder.encode(serialized).byteLength > maximumBlackboardCollectionBytes
+  ) {
+    throw new Error('This document has reached its blackboard storage limit.');
+  }
 }
